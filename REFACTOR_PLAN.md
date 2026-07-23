@@ -151,24 +151,28 @@ looking entirely reasonable.**
 
 ## Verification status
 
-**Verified:**
+**Verified — automated:**
 - Builds clean, `fbc64 -w all`, zero warnings.
 - `CMESSAGEBOX_SELFTEST=1` — **75/75**, plus the demo's host-painter probe.
 - The tone probe **A/B'd in both directions**, twice (control painter and demo painter).
 - Tab navigability asserted end to end through `GetNextDlgTabItem`, not inferred from style bits.
 
-**NOT verified — the interactive pass is the author's, and nothing below has been exercised:**
-- **The modal loop has never run.** Every assertion deliberately avoids it, so `DoModal`,
-  the parent disable/restore, activation handling and the `PostQuitMessage` re-post path are
-  **build- and reasoning-verified only**. This is the highest-risk item in the repo.
-- Dragging by the caption; the X's hover, press and press-cancel; Esc / Alt+F4 answering the
-  cancel id; Enter firing the default button from each focus position; Tab and Shift+Tab in a
-  live box.
-- The parent being genuinely dead while the box is up, and alive after.
-- **Nested boxes** (demo row 9) — two modal loops on the stack at once.
-- Closing the host while a box is open.
-- Pixel appearance of anything, including whether the light theme in demo row 4 actually matches
-  the reference screenshot. The control's own defaults are dark and have never been seen.
-- Nothing has run above 100% DPI, and no multi-monitor or negative-coordinate placement has been
-  tested — `CMessageBox_ComputeOrigin` clamps for it, and that clamp is unexercised.
-- **No host uses this control.**
+**Verified — the interactive pass has been RUN AND PASSED** (2026-07-23, by the author). That is
+what closes this out, and it mattered more here than in a typical control: the modal loop is the
+majority of what this thing does and **not one assertion touches it**, by design. Everything the
+automated evidence could not reach was exercised by hand — `DoModal` itself, the parent
+disable/restore, caption dragging, the close X, Esc / Alt+F4, Enter and Tab in a live box,
+nested boxes (demo row 9, two modal loops on the stack at once), and the pixel appearance of all
+eleven demo rows including the light theme against the reference screenshot.
+
+**Still NOT verified:**
+- **No host uses this control.** It has only ever run in its own demo, so `DoModal` has never
+  been called from inside a real application's message pump, and the interaction between a host
+  that already owns a pump and a control that starts a second one is the thing a first host is
+  most likely to expose.
+- **Closing the host while a box is open** — the `PostQuitMessage` re-post path. Reachable only
+  by killing the demo window from the taskbar mid-box; not part of the pass.
+- **Nothing has run above 100% DPI**, and no multi-monitor or negative-coordinate placement has
+  been tested. `CMessageBox_ComputeOrigin` clamps for both, and that clamp is unexercised.
+- A message far taller than the work area. The box would be clipped rather than scrolled — a
+  known limit (see the README), not a bug, but it has not been looked at.
