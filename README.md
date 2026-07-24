@@ -4,17 +4,6 @@ An owner-drawn modal message box for FreeBASIC Win32 applications: an owner-draw
 with a title and a close X, a body holding an optional icon and a wrapped left-justified message,
 and a footer holding one to three buttons.
 
-```
-   +-- caption ------------------------------------+
-   |  Warning                                 [X]  |
-   +-- body ---------------------------------------+
-   |   /!\   This buffer contains unsaved edits.   |
-   |         Do you want to save it?               |
-   +-- footer -------------------------------------+
-   |          [ Save ] [ Don't Save ] [ Cancel ]   |
-   +-----------------------------------------------+
-```
-
 It is the control you reach for when `MessageBox()` would do the job but looks like it came from a
 different application than the rest of yours. Every pixel is drawn by this control — the caption
 band, the title, the close X, the icon, the message and the chrome — so nothing about its
