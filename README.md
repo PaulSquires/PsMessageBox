@@ -29,6 +29,14 @@ your message pump.
 
 ---
 
+## What it looks like
+
+![The CMessageBox demo](CMessageBox.png)
+
+An actual modal box, raised from the demo and captured while its nested message loop was running. The caption band, its title and the close X are all owner-drawn; below them an icon and a wrapped, left-justified message, then one to three `CButton`s with the default carrying the accent border. These are the shipped **dark** defaults; the light set matching the reference screenshot lives in the demo.
+
+---
+
 ## Requirements
 
 **Files to copy into your project:**
