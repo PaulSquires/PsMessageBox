@@ -1,5 +1,5 @@
 ' ========================================================================================
-' CMessageBox - demo harness
+' PsMessageBox - demo harness
 ' ========================================================================================
 
 #define UNICODE
@@ -49,9 +49,9 @@ dim shared theme as THEME_TYPE
 
 
 
-#include once "CBufferPaint.inc"
-#include once "CButton.inc"
-#include once "CMessageBox.inc"
+#include once "PsBufferPaint.inc"
+#include once "PsButton.inc"
+#include once "PsMessageBox.inc"
 #include once "frmMain.inc"
 
 
@@ -82,7 +82,7 @@ function WinMain( _
         return 1
     end if
 
-    ' Initialize GDI+ (CBufferPaint draws all geometry through it). Must be running before the
+    ' Initialize GDI+ (PsBufferPaint draws all geometry through it). Must be running before the
     ' first WM_PAINT builds a buffer, and must outlive every one of them, so it brackets
     ' frmMain_Show.
     dim as ULONG_PTR gdipToken = AfxGdipInit()
@@ -94,7 +94,7 @@ function WinMain( _
     ' plain RemoveFontResource does not match an FR_PRIVATE registration and leaks it.
     if len(wszFontFile) then RemoveFontResourceEx( wszFontFile.vptr, FR_PRIVATE, NULL )
 
-    ' Every window is destroyed and every CBufferPaint has run its destructor by here, so no
+    ' Every window is destroyed and every PsBufferPaint has run its destructor by here, so no
     ' CGp* object can still be alive. Precedes CoUninitialize: GDI+ leans on COM.
     AfxGdipShutdown( gdipToken )
 

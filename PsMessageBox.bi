@@ -1,64 +1,64 @@
 ''
-''  CMessageBox.bi  --  owner-drawn modal message box (caption + icon + wrapped text + buttons)
+''  PsMessageBox.bi  --  owner-drawn modal message box (caption + icon + wrapped text + buttons)
 ''
 
 #pragma once
 
-' ONE THING CBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
+' ONE THING PsBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
 ' AfxNova, and every host in this family says "using AfxNova" -- so ANY identifier named "ok"
 ' becomes a duplicate definition. The family convention is bOK.
-#include once "CBufferPaint.bi"
-' The footer buttons ARE CButtons. This control is the first in the family to be a genuine
+#include once "PsBufferPaint.bi"
+' The footer buttons ARE PsButtons. This control is the first in the family to be a genuine
 ' container of siblings, so unlike every other .bi here this one pulls in another control.
-#include once "CButton.bi"
+#include once "PsButton.bi"
 
 ' Polling timer that guarantees the close button's hot-tracking is cleared when the mouse
 ' leaves. WM_MOUSELEAVE (TME_LEAVE) is not reliably delivered on fast exits. Timer IDs are
 ' per-window, so every instance can share this id.
 #define IDT_CMESSAGEBOX_HOTTRACK   &hCB91
-#define CMESSAGEBOX_HOTTRACK_MS    100
+#define PSMESSAGEBOX_HOTTRACK_MS    100
 
 ' The most buttons the footer will hold. Not an arbitrary cap: a message box that needs a
 ' fourth choice wants a real dialog, and the layout arithmetic below is written against a
 ' fixed-size array precisely so there is no index fix-up code to get wrong.
-#define CMESSAGEBOX_MAXBUTTONS      3
+#define PSMESSAGEBOX_MAXBUTTONS      3
 
 ' Control ids handed to the footer buttons. The HOST's return ids are set separately with
-' CButton_SetID, so these never enter anyone's command stream -- they exist only so
+' PsButton_SetID, so these never enter anyone's command stream -- they exist only so
 ' GetDlgItem / GetNextDlgTabItem have something to report.
 #define IDC_CMESSAGEBOX_BUTTON_BASE 8100
 
 ' Default geometry, in unscaled pixels. Everything except the THICKNESS values is DPI-scaled
 ' once at Create; every setter afterwards takes raw pixels and the caller scales (family rule).
-#define CMESSAGEBOX_DEFAULT_CAPTIONHEIGHT  34
-#define CMESSAGEBOX_DEFAULT_CAPTIONPADX    14
-#define CMESSAGEBOX_DEFAULT_CLOSEWIDTH     44
-#define CMESSAGEBOX_DEFAULT_BODYPADX       20
-#define CMESSAGEBOX_DEFAULT_BODYPADY       20
-#define CMESSAGEBOX_DEFAULT_FOOTERPADX     20
-#define CMESSAGEBOX_DEFAULT_FOOTERPADY     14
-#define CMESSAGEBOX_DEFAULT_ICONWIDTH      32
-#define CMESSAGEBOX_DEFAULT_ICONHEIGHT     32
-#define CMESSAGEBOX_DEFAULT_ICONGAP        16
-#define CMESSAGEBOX_DEFAULT_BUTTONGAP       8
-#define CMESSAGEBOX_DEFAULT_BUTTONMINWIDTH 88
-#define CMESSAGEBOX_DEFAULT_MAXWIDTH      420
-#define CMESSAGEBOX_DEFAULT_MINWIDTH      300
-#define CMESSAGEBOX_DEFAULT_BORDERTHICK     1     ' not DPI-scaled -- a hairline stays a hairline
-#define CMESSAGEBOX_DEFAULT_DIVIDERTHICK    1     ' likewise
+#define PSMESSAGEBOX_DEFAULT_CAPTIONHEIGHT  34
+#define PSMESSAGEBOX_DEFAULT_CAPTIONPADX    14
+#define PSMESSAGEBOX_DEFAULT_CLOSEWIDTH     44
+#define PSMESSAGEBOX_DEFAULT_BODYPADX       20
+#define PSMESSAGEBOX_DEFAULT_BODYPADY       20
+#define PSMESSAGEBOX_DEFAULT_FOOTERPADX     20
+#define PSMESSAGEBOX_DEFAULT_FOOTERPADY     14
+#define PSMESSAGEBOX_DEFAULT_ICONWIDTH      32
+#define PSMESSAGEBOX_DEFAULT_ICONHEIGHT     32
+#define PSMESSAGEBOX_DEFAULT_ICONGAP        16
+#define PSMESSAGEBOX_DEFAULT_BUTTONGAP       8
+#define PSMESSAGEBOX_DEFAULT_BUTTONMINWIDTH 88
+#define PSMESSAGEBOX_DEFAULT_MAXWIDTH      420
+#define PSMESSAGEBOX_DEFAULT_MINWIDTH      300
+#define PSMESSAGEBOX_DEFAULT_BORDERTHICK     1     ' not DPI-scaled -- a hairline stays a hairline
+#define PSMESSAGEBOX_DEFAULT_DIVIDERTHICK    1     ' likewise
 
 ' The glyphs the icon kinds resolve to (Segoe Fluent Icons / Segoe MDL2 Assets codepoints), and
 ' the close button's. They are #defines rather than literals buried in the resolver so a host
 ' that ships a different icon font can see exactly what to remap.
-#define CMESSAGEBOX_GLYPH_INFO      &hE946      ' Info
-#define CMESSAGEBOX_GLYPH_WARNING   &hE7BA      ' Warning  (the triangle in the reference shot)
-#define CMESSAGEBOX_GLYPH_ERROR     &hEA39      ' ErrorBadge
-#define CMESSAGEBOX_GLYPH_QUESTION  &hE9CE      ' StatusCircleQuestionMark
-#define CMESSAGEBOX_GLYPH_CLOSE     &hE8BB      ' ChromeClose
+#define PSMESSAGEBOX_GLYPH_INFO      &hE946      ' Info
+#define PSMESSAGEBOX_GLYPH_WARNING   &hE7BA      ' Warning  (the triangle in the reference shot)
+#define PSMESSAGEBOX_GLYPH_ERROR     &hEA39      ' ErrorBadge
+#define PSMESSAGEBOX_GLYPH_QUESTION  &hE9CE      ' StatusCircleQuestionMark
+#define PSMESSAGEBOX_GLYPH_CLOSE     &hE8BB      ' ChromeClose
 
 
 ' The icon on the left. Each kind resolves to a glyph AND to its own colour -- see
-' CMessageBox_ResolveGlyph / CMessageBox_ResolveIconColor, which are PURE FUNCTIONS so the whole
+' PsMessageBox_ResolveGlyph / PsMessageBox_ResolveIconColor, which are PURE FUNCTIONS so the whole
 ' mapping can be asserted rather than only observed inside a paint.
 '
 ' MBX_ICON_NONE is not "no artwork available", it is a real layout state: the icon cell and its
@@ -71,8 +71,8 @@ enum
     MBX_ICON_QUESTION
 end enum
 
-' Ready-made button sets for CMessageBox_AddPreset and CMessageBox_Show. Every one of them is
-' just a sequence of CMessageBox_AddButton calls plus a SetDefaultButton and a SetCancelID --
+' Ready-made button sets for PsMessageBox_AddPreset and PsMessageBox_Show. Every one of them is
+' just a sequence of PsMessageBox_AddButton calls plus a SetDefaultButton and a SetCancelID --
 ' there is nothing a preset can express that a host cannot write out by hand, which is the point
 ' of having free-form AddButton underneath.
 '
@@ -87,7 +87,7 @@ enum
     MBX_BTN_SAVE_DONTSAVE_CANCEL    ' [Save] [Don't Save] [Cancel]        default Save, cancel Cancel
 end enum
 
-' Which rect CMessageBox_CountRenderedTones looks at. See that function for why it exists.
+' Which rect PsMessageBox_CountRenderedTones looks at. See that function for why it exists.
 enum
     MBX_PART_CAPTION = 0
     MBX_PART_BODY
@@ -100,11 +100,11 @@ end enum
 
 ' Colors for the built-in painter. Copied on Set.
 '
-' THE DEFAULTS ARE DARK, inherited from CBUTTON_COLORS' palette rather than matched to the light
+' THE DEFAULTS ARE DARK, inherited from PSBUTTON_COLORS' palette rather than matched to the light
 ' reference screenshot. A box built with no colour calls therefore looks like the rest of this
 ' family, which is what a host of these controls actually wants; the demo shows a light set.
 '
-' THE CLOSE BUTTON IS NOT A CButton (it would be a fourth tabstop), so it carries its own three
+' THE CLOSE BUTTON IS NOT A PsButton (it would be a fourth tabstop), so it carries its own three
 ' colour pairs here. Its hot pair is the Windows close-red rather than the theme accent, because
 ' that colour is the one universally understood "this discards" signal.
 '
@@ -144,7 +144,7 @@ end type
 ' callback draws the box AROUND them and must not try to draw them.
 type MBX_PAINTINFO
     hMsgBox        as HWND              ' the box, so the callback can query it
-    b              as CBufferPaint ptr  ' the box's buffer for this repaint (no copy)
+    b              as PsBufferPaint ptr  ' the box's buffer for this repaint (no copy)
     ' --- Geometry, all precomputed by LayoutBox ---
     rcClient       as RECT              ' the whole client area
     rcCaption      as RECT              ' the caption band, full width
@@ -183,14 +183,14 @@ end type
 ' that only wants to add something on top does not have to repaint the background.
 '
 ' TWO CONTRACTS WORTH HONOURING:
-'   - Draw the message with the SAME font you handed to CMessageBox_SetFont, and with
+'   - Draw the message with the SAME font you handed to PsMessageBox_SetFont, and with
 '     DT_WORDBREAK. The box's HEIGHT was measured with that font and that flag; a different
 '     either means the height lies and the text clips.
 '   - DO NOT reach for PaintBorderRect to draw the window outline or the footer divider. It
 '     FILLS unconditionally, so used as an outline it erases everything beneath it -- a mistake
-'     this family has now made three separate times (CToggle, CComboBox, CNumericUpDown), every
+'     this family has now made three separate times (PsToggle, PsComboBox, PsNumericUpDown), every
 '     time by copying a sibling's callback. PaintRoundOutline and PaintLine stroke without
-'     filling. CMessageBox_CountRenderedTones exists to let you assert you have not done it.
+'     filling. PsMessageBox_CountRenderedTones exists to let you assert you have not done it.
 type MBX_PaintCallbackSub as sub( byval p as MBX_PAINTINFO ptr )
 
 ' Observe messages. Return TRUE if you handled it and want the control's default handling
@@ -199,7 +199,7 @@ type MBX_PaintCallbackSub as sub( byval p as MBX_PAINTINFO ptr )
 ' CAUTION: the result is IGNORED for three messages.
 '   WM_LBUTTONUP        - the box holds mouse capture across a press on the X, and the
 '                         up-message is what releases it: a callback that suppressed it would
-'                         strand capture (the CListBox bug recorded in Learnings.md).
+'                         strand capture (the PsListBox bug recorded in Learnings.md).
 '   WM_CLOSE            - a modal box MUST be able to end. Suppressing the close would leave the
 '                         nested message loop spinning with the parent disabled, which is an
 '                         unrecoverable hang rather than a refused action. Veto the dismissal by
@@ -209,13 +209,13 @@ type MBX_PaintCallbackSub as sub( byval p as MBX_PAINTINFO ptr )
 type MBX_MessageCallbackFunc as function( byval m as MBX_MESSAGEINFO ptr ) as boolean
 
 
-type CMESSAGEBOX
+type PSMESSAGEBOX
     hWin            as HWND
     hParent         as HWND = 0        ' disabled for the duration of DoModal. 0 is legal.
     ' --- Content ---
     wszCaption      as DWSTRING        ' the title. "" draws an empty band, it does not remove it
     wszText         as DWSTRING        ' the message. Wrapped, left-justified
-    wszGlyph        as DWSTRING        ' set only by CMessageBox_SetGlyph (host override)
+    wszGlyph        as DWSTRING        ' set only by PsMessageBox_SetGlyph (host override)
     bGlyphOverride  as boolean = false
     clrIconOverride as COLORREF = 0
     bIconOverride   as boolean = false
@@ -223,8 +223,8 @@ type CMESSAGEBOX
     bBeep           as boolean = true  ' MessageBeep for the kind, before the box is shown
     ' --- Buttons. A FIXED array, not a dynamic one: the cap is 3 by contract, so there is no
     '     insert/delete/reorder and none of the stored-index fix-up code the collection siblings
-    '     carry exists here (CSelectBar's and CIconPanel's static-by-contract rule). ---
-    hButtons(0 to CMESSAGEBOX_MAXBUTTONS - 1) as HWND
+    '     carry exists here (PsSelectBar's and PsIconPanel's static-by-contract rule). ---
+    hButtons(0 to PSMESSAGEBOX_MAXBUTTONS - 1) as HWND
     nButtonCount    as long = 0
     nDefaultIndex   as long = -1       ' -1 = none. Paints the accent border AND claims Enter
     nFocusIndex     as long = -1       ' -1 = "the default, else the first"
@@ -239,7 +239,7 @@ type CMESSAGEBOX
     isClosePressed  as boolean = false
     hotTimerOn      as boolean = false
     colors          as MBX_COLORS
-    btnColors       as CBUTTON_COLORS  ' pushed into every button as it is added
+    btnColors       as PSBUTTON_COLORS  ' pushed into every button as it is added
     ' Caller-supplied fonts (caller owns all three). NOT named hFont: FreeBASIC is
     ' case-insensitive, so a member called hFont would shadow the TYPE name HFONT inside every
     ' member procedure of this type. See C:\dev\Learnings.md.
@@ -255,24 +255,24 @@ type CMESSAGEBOX
     ' sized that font for the X rather than for the icon.
     hCloseFont      as HFONT
     ' --- Layout inputs. All pixels; DPI-scaled once at Create, raw thereafter. ---
-    nCaptionHeight  as long = CMESSAGEBOX_DEFAULT_CAPTIONHEIGHT
-    nCaptionPadX    as long = CMESSAGEBOX_DEFAULT_CAPTIONPADX
-    nCloseWidth     as long = CMESSAGEBOX_DEFAULT_CLOSEWIDTH
-    nBodyPadX       as long = CMESSAGEBOX_DEFAULT_BODYPADX
-    nBodyPadY       as long = CMESSAGEBOX_DEFAULT_BODYPADY
-    nFooterPadX     as long = CMESSAGEBOX_DEFAULT_FOOTERPADX
-    nFooterPadY     as long = CMESSAGEBOX_DEFAULT_FOOTERPADY
+    nCaptionHeight  as long = PSMESSAGEBOX_DEFAULT_CAPTIONHEIGHT
+    nCaptionPadX    as long = PSMESSAGEBOX_DEFAULT_CAPTIONPADX
+    nCloseWidth     as long = PSMESSAGEBOX_DEFAULT_CLOSEWIDTH
+    nBodyPadX       as long = PSMESSAGEBOX_DEFAULT_BODYPADX
+    nBodyPadY       as long = PSMESSAGEBOX_DEFAULT_BODYPADY
+    nFooterPadX     as long = PSMESSAGEBOX_DEFAULT_FOOTERPADX
+    nFooterPadY     as long = PSMESSAGEBOX_DEFAULT_FOOTERPADY
     ' NOTE: "width" is a FreeBASIC reserved word (see C:\dev\Learnings.md) and produces errors
     ' that never name the real problem -- hence nIconWidth, nBoxWidth and friends throughout.
-    nIconWidth      as long = CMESSAGEBOX_DEFAULT_ICONWIDTH
-    nIconHeight     as long = CMESSAGEBOX_DEFAULT_ICONHEIGHT
-    nIconGap        as long = CMESSAGEBOX_DEFAULT_ICONGAP
-    nButtonGap      as long = CMESSAGEBOX_DEFAULT_BUTTONGAP
-    nButtonMinWidth as long = CMESSAGEBOX_DEFAULT_BUTTONMINWIDTH
-    nMaxWidth       as long = CMESSAGEBOX_DEFAULT_MAXWIDTH
-    nMinWidth       as long = CMESSAGEBOX_DEFAULT_MINWIDTH
-    nBorderThick    as long = CMESSAGEBOX_DEFAULT_BORDERTHICK    ' NOT DPI-scaled
-    nDividerThick   as long = CMESSAGEBOX_DEFAULT_DIVIDERTHICK   ' NOT DPI-scaled
+    nIconWidth      as long = PSMESSAGEBOX_DEFAULT_ICONWIDTH
+    nIconHeight     as long = PSMESSAGEBOX_DEFAULT_ICONHEIGHT
+    nIconGap        as long = PSMESSAGEBOX_DEFAULT_ICONGAP
+    nButtonGap      as long = PSMESSAGEBOX_DEFAULT_BUTTONGAP
+    nButtonMinWidth as long = PSMESSAGEBOX_DEFAULT_BUTTONMINWIDTH
+    nMaxWidth       as long = PSMESSAGEBOX_DEFAULT_MAXWIDTH
+    nMinWidth       as long = PSMESSAGEBOX_DEFAULT_MINWIDTH
+    nBorderThick    as long = PSMESSAGEBOX_DEFAULT_BORDERTHICK    ' NOT DPI-scaled
+    nDividerThick   as long = PSMESSAGEBOX_DEFAULT_DIVIDERTHICK   ' NOT DPI-scaled
     ' --- Layout outputs. Rects are DERIVED, never set from outside; LayoutBox() owns them.
     '     Layout is lazy: mutators mark it dirty, the next paint (or any size query) runs it,
     '     which coalesces a burst of mutations into ONE measuring pass. ---
@@ -290,7 +290,7 @@ type CMESSAGEBOX
     rcIcon          as RECT         ' derived
     rcText          as RECT         ' derived -- the WRAP BOX, see MBX_PAINTINFO
     rcFooter        as RECT         ' derived
-    rcButtons(0 to CMESSAGEBOX_MAXBUTTONS - 1) as RECT   ' derived; applied by PositionButtons
+    rcButtons(0 to PSMESSAGEBOX_MAXBUTTONS - 1) as RECT   ' derived; applied by PositionButtons
     bLayoutDirty    as boolean = true
     PaintCallback   as MBX_PaintCallbackSub      ' optional; replaces the built-in painter
     MessageCallback as MBX_MessageCallbackFunc   ' optional
@@ -310,7 +310,7 @@ end type
 '
 ' A HOST GLYPH OVERRIDE BEATS MBX_ICON_NONE. Setting a glyph is an unambiguous request for an
 ' icon, so it turns the cell on rather than being silently ignored because the kind is NONE.
-function CMESSAGEBOX.HasIcon() as boolean
+function PSMESSAGEBOX.HasIcon() as boolean
     if this.bGlyphOverride andalso (len( this.wszGlyph ) > 0) then return true
     return (this.nIconKind <> MBX_ICON_NONE)
 end function
@@ -320,11 +320,11 @@ end function
 '
 ' UNSET DEFAULTS TO THE LAST BUTTON, which is Cancel in every preset and in the reference
 ' screenshot. That is a convention, not a law -- a host whose last button is destructive MUST
-' call CMessageBox_SetCancelID. With no buttons at all there is nothing to name, so 0.
-function CMESSAGEBOX.ResolveCancelID() as long
+' call PsMessageBox_SetCancelID. With no buttons at all there is nothing to name, so 0.
+function PSMESSAGEBOX.ResolveCancelID() as long
     if this.bCancelIDSet then return this.nCancelID
     if this.nButtonCount <= 0 then return 0
-    return CButton_GetID( this.hButtons( this.nButtonCount - 1 ) )
+    return PsButton_GetID( this.hButtons( this.nButtonCount - 1 ) )
 end function
 
 
@@ -334,7 +334,7 @@ end function
 ' default button, else the first. That is what makes SetDefaultButton alone do the right thing
 ' for the common case (the reference screenshot, where Save is both) while still allowing
 ' "Cancel focused, Delete default".
-function CMESSAGEBOX.ResolveFocusIndex() as long
+function PSMESSAGEBOX.ResolveFocusIndex() as long
     if this.nButtonCount <= 0 then return -1
     if this.bFocusExplicit andalso (this.nFocusIndex >= 0) andalso _
        (this.nFocusIndex < this.nButtonCount) then return this.nFocusIndex
@@ -347,14 +347,14 @@ end function
 
 ' Forget any live press on the X WITHOUT touching the capture. Releasing capture is the
 ' WndProc's job, and only on the up-message or WM_DESTROY.
-sub CMESSAGEBOX.CancelClosePress()
+sub PSMESSAGEBOX.CancelClosePress()
     this.isClosePressed = false
 end sub
 
 
 ' Mark the layout stale and request a repaint. Every mutator routes through here, which is what
 ' makes layout lazy: a burst of setters costs one measuring pass, not N.
-sub CMESSAGEBOX.Refresh()
+sub PSMESSAGEBOX.Refresh()
     this.bLayoutDirty = true
     if this.hWin then InvalidateRect( this.hWin, NULL, TRUE )
 end sub
@@ -367,7 +367,7 @@ end sub
 '   iconBlock    = hasIcon ? nIconWidth + nIconGap : 0
 '   availW       = nMaxWidth - 2*nBodyPadX - iconBlock          the WRAP width
 '   textW/textH  = DrawTextW( DT_CALCRECT or DT_WORDBREAK ) at availW
-'   btnW(i)      = max( CButton ideal width , nButtonMinWidth )
+'   btnW(i)      = max( PsButton ideal width , nButtonMinWidth )
 '   nButtonH     = the TALLEST button's ideal height
 '   nFooterH     = nButtonCount ? 2*nFooterPadY + nButtonH : 0
 '   nBodyH       = 2*nBodyPadY + max( textH , hasIcon ? nIconHeight : 0 )
@@ -391,9 +391,9 @@ end sub
 ' three different widths).
 '
 ' WHY THE MEASURING PASS RUNS BEFORE THE ZERO-CLIENT BAIL: nIdealW/nIdealH do not depend on the
-' client area at all, and DoModal calls CMessageBox_GetIdealSize to decide how big to MAKE the
+' client area at all, and DoModal calls PsMessageBox_GetIdealSize to decide how big to MAKE the
 ' window in the first place. Returning 0 until it had already been sized would be a
-' chicken-and-egg trap (CButton and CComboBox dodge it by this same ordering).
+' chicken-and-egg trap (PsButton and PsComboBox dodge it by this same ordering).
 '
 ' OVERFLOW: when the client is smaller than ideal the rects are computed HONESTLY rather than
 ' squeezed (the family rule) -- rcText and rcCaptionText collapse, clamped to EMPTY rather than
@@ -401,7 +401,7 @@ end sub
 ' make that happen (DoModal always sizes to ideal); it matters only for a host that resized the
 ' box itself.
 ' ========================================================================================
-sub CMESSAGEBOX.LayoutBox()
+sub PSMESSAGEBOX.LayoutBox()
     this.bLayoutDirty = false
     if this.hWin = 0 then exit sub
 
@@ -436,7 +436,7 @@ sub CMESSAGEBOX.LayoutBox()
         SetRect( @rcCalc, 0, 0, availW, 0 )
         ' DT_CALCRECT with DT_WORDBREAK is the whole auto-height mechanism: it returns the
         ' height the wrapped text needs AND the width it actually used. DT_NOPREFIX matches
-        ' CBufferPaint.PaintText, which forces it -- without it here, a message containing "&"
+        ' PsBufferPaint.PaintText, which forces it -- without it here, a message containing "&"
         ' would measure one width and draw another.
         DrawTextW( hDC, cast( LPCWSTR, this.wszText.vptr ), len( this.wszText ), @rcCalc, _
                    DT_CALCRECT or DT_WORDBREAK or DT_LEFT or DT_NOPREFIX or DT_EXPANDTABS )
@@ -461,14 +461,14 @@ sub CMESSAGEBOX.LayoutBox()
     ReleaseDC( this.hWin, hDC )
 
     ' ---- the buttons, measured through their own public API --------------------------------
-    ' CButton_GetIdealSize forces the button's own pending layout, so this is valid even for a
+    ' PsButton_GetIdealSize forces the button's own pending layout, so this is valid even for a
     ' button added moments ago and never sized -- which is always the case here.
-    dim btnW(0 to CMESSAGEBOX_MAXBUTTONS - 1) as long
+    dim btnW(0 to PSMESSAGEBOX_MAXBUTTONS - 1) as long
     this.nButtonH = 0
     dim as long sumBtnW = 0
     for i as long = 0 to this.nButtonCount - 1
         dim as long bw, bh
-        CButton_GetIdealSize( this.hButtons(i), bw, bh )
+        PsButton_GetIdealSize( this.hButtons(i), bw, bh )
         if bw < this.nButtonMinWidth then bw = this.nButtonMinWidth
         btnW(i) = bw
         sumBtnW += bw
@@ -559,7 +559,7 @@ sub CMESSAGEBOX.LayoutBox()
     end if
 
     ' --- the buttons, right-aligned, laid out from the right edge inwards ---
-    for i as long = 0 to CMESSAGEBOX_MAXBUTTONS - 1
+    for i as long = 0 to PSMESSAGEBOX_MAXBUTTONS - 1
         SetRectEmpty( @this.rcButtons(i) )
     next
     if this.nButtonCount > 0 then
@@ -575,18 +575,18 @@ end sub
 
 ' ========================================================================================
 ' Which glyph does an icon kind draw?  A PURE FUNCTION on purpose: it takes no control pointer
-' and touches no global, so the whole mapping can be asserted directly (CButton_ResolveMood's
+' and touches no global, so the whole mapping can be asserted directly (PsButton_ResolveMood's
 ' precedent) rather than only being observable from inside a WM_PAINT.
 '
 ' The HOST OVERRIDE is deliberately NOT folded in here -- that lives in the painter, so this
 ' function answers exactly one question and answers it the same way every time.
 ' ========================================================================================
-function CMessageBox_ResolveGlyph( byval nKind as long ) as DWSTRING
+function PsMessageBox_ResolveGlyph( byval nKind as long ) as DWSTRING
     select case nKind
-    case MBX_ICON_INFO     : return wchr( CMESSAGEBOX_GLYPH_INFO )
-    case MBX_ICON_WARNING  : return wchr( CMESSAGEBOX_GLYPH_WARNING )
-    case MBX_ICON_ERROR    : return wchr( CMESSAGEBOX_GLYPH_ERROR )
-    case MBX_ICON_QUESTION : return wchr( CMESSAGEBOX_GLYPH_QUESTION )
+    case MBX_ICON_INFO     : return wchr( PSMESSAGEBOX_GLYPH_INFO )
+    case MBX_ICON_WARNING  : return wchr( PSMESSAGEBOX_GLYPH_WARNING )
+    case MBX_ICON_ERROR    : return wchr( PSMESSAGEBOX_GLYPH_ERROR )
+    case MBX_ICON_QUESTION : return wchr( PSMESSAGEBOX_GLYPH_QUESTION )
     end select
     return ""
 end function
@@ -597,7 +597,7 @@ end function
 ' foreground rather than with an arbitrary sentinel: nothing will be drawn with it, and a
 ' sentinel would be a colour a careless painter could actually use.
 ' ========================================================================================
-function CMessageBox_ResolveIconColor( _
+function PsMessageBox_ResolveIconColor( _
             byval nKind   as long, _
             byval pColors as MBX_COLORS ptr _
             ) as COLORREF
@@ -618,20 +618,20 @@ end function
 ' ========================================================================================
 '
 ' A MODAL MESSAGE BOX: an owner-drawn caption band with a title and a close X, a body holding an
-' optional icon and a wrapped left-justified message, and a footer holding one to three CButtons.
+' optional icon and a wrapped left-justified message, and a footer holding one to three PsButtons.
 '
 ' IT BLOCKS
-'   CMessageBox_DoModal runs its own nested GetMessage loop and does not return until the box is
+'   PsMessageBox_DoModal runs its own nested GetMessage loop and does not return until the box is
 '   dismissed. That is the one big departure from every other control in this family, which are
 '   passive and pumped by their host.
 '
 ' THERE IS NO PUMP OBLIGATION
 '   Precisely BECAUSE it owns its own loop, the box calls IsDialogMessage itself -- so Tab, the
-'   focus ring and Space/Enter all work with nothing added to the host's pump. Unlike CComboBox,
-'   CNumericUpDown and CTextBox there is no CMessageBox_FilterMessage.
+'   focus ring and Space/Enter all work with nothing added to the host's pump. Unlike PsComboBox,
+'   PsNumericUpDown and PsTextBox there is no PsMessageBox_FilterMessage.
 '
 ' IT IS A CONTAINER, AND THAT IS WHY IT CARRIES WS_EX_CONTROLPARENT
-'   The exact opposite of the CButton fix. The tabstops here are the child buttons, so the dialog
+'   The exact opposite of the PsButton fix. The tabstops here are the child buttons, so the dialog
 '   manager MUST descend into this window. Do not "correct" this to 0; see the per-sibling table
 '   in C:\dev\Learnings.md, and the self-test, which asserts the flag both ways.
 '
@@ -648,7 +648,7 @@ end function
 '   message is drawn with DrawTextW and there is no text object to select from.
 '
 ' LIFETIME
-'   CMessageBox_DoModal DESTROYS the box before returning, so the handle is dead afterwards. A
+'   PsMessageBox_DoModal DESTROYS the box before returning, so the handle is dead afterwards. A
 '   box created and then abandoned without DoModal must be destroyed by the host with
 '   DestroyWindow. The three fonts you pass in stay yours.
 '
@@ -658,12 +658,12 @@ end function
 '   Create makes a hidden, zero-sized WS_POPUP window. Configure it, then DoModal, which
 '     measures, sizes, centres, shows, pumps, and returns the id of whatever dismissed it.
 '   DoModal returns the clicked button's id, or -- for Esc / the X / Alt+F4 / a WM_CLOSE from
-'     anywhere -- whatever CMESSAGEBOX.ResolveCancelID() answers.
+'     anywhere -- whatever PSMESSAGEBOX.ResolveCancelID() answers.
 '   Show is Create + configure + DoModal in one call, for the common case.
 ' ----------------------------------------------------------------------------------------
-declare function CMessageBox_Create( byval hWndParent as HWND ) as HWND
-declare function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
-declare function CMessageBox_Show( byval hWndParent as HWND, _
+declare function PsMessageBox_Create( byval hWndParent as HWND ) as HWND
+declare function PsMessageBox_DoModal( byval hMsgBox as HWND ) as long
+declare function PsMessageBox_Show( byval hWndParent as HWND, _
                                    byval Text as DWSTRING, _
                                    byval Caption as DWSTRING, _
                                    byval nIconKind as long = MBX_ICON_NONE, _
@@ -672,7 +672,7 @@ declare function CMessageBox_Show( byval hWndParent as HWND, _
 ' ----------------------------------------------------------------------------------------
 ' Content.  All SILENT.
 '
-'   SetCaption is the title in the band. It is NOT the window text -- unlike CButton, this
+'   SetCaption is the title in the band. It is NOT the window text -- unlike PsButton, this
 '     control does not alias WM_SETTEXT, because a message box is not something generic dialog
 '     code walks looking for captions.
 '   SetText is the message. Embedded CRLF is honoured as well as the automatic wrap.
@@ -682,23 +682,23 @@ declare function CMessageBox_Show( byval hWndParent as HWND, _
 '   SetBeep(false) suppresses the MessageBeep that otherwise fires for the kind just before the
 '     box is shown.
 ' ----------------------------------------------------------------------------------------
-declare function CMessageBox_GetCaption( byval hMsgBox as HWND ) as DWSTRING
-declare sub      CMessageBox_SetCaption( byval hMsgBox as HWND, byval Text as DWSTRING )
-declare function CMessageBox_GetText( byval hMsgBox as HWND ) as DWSTRING
-declare sub      CMessageBox_SetText( byval hMsgBox as HWND, byval Text as DWSTRING )
-declare function CMessageBox_GetIconKind( byval hMsgBox as HWND ) as long
-declare sub      CMessageBox_SetIconKind( byval hMsgBox as HWND, byval nKind as long )
-declare sub      CMessageBox_SetGlyph( byval hMsgBox as HWND, byval Glyph as DWSTRING )
-declare sub      CMessageBox_SetIconColor( byval hMsgBox as HWND, byval clr as COLORREF )
-declare sub      CMessageBox_SetBeep( byval hMsgBox as HWND, byval bBeep as boolean )
+declare function PsMessageBox_GetCaption( byval hMsgBox as HWND ) as DWSTRING
+declare sub      PsMessageBox_SetCaption( byval hMsgBox as HWND, byval Text as DWSTRING )
+declare function PsMessageBox_GetText( byval hMsgBox as HWND ) as DWSTRING
+declare sub      PsMessageBox_SetText( byval hMsgBox as HWND, byval Text as DWSTRING )
+declare function PsMessageBox_GetIconKind( byval hMsgBox as HWND ) as long
+declare sub      PsMessageBox_SetIconKind( byval hMsgBox as HWND, byval nKind as long )
+declare sub      PsMessageBox_SetGlyph( byval hMsgBox as HWND, byval Glyph as DWSTRING )
+declare sub      PsMessageBox_SetIconColor( byval hMsgBox as HWND, byval clr as COLORREF )
+declare sub      PsMessageBox_SetBeep( byval hMsgBox as HWND, byval bBeep as boolean )
 
 ' ----------------------------------------------------------------------------------------
 ' Buttons.  One to three, laid out left to right in the order added and right-aligned in the
 ' footer. Tab order follows the order added.
 '
-'   AddButton returns the CButton's HWND so a host can reach past this API for anything the
+'   AddButton returns the PsButton's HWND so a host can reach past this API for anything the
 '     box does not expose (a glyph on one button, a different colour set for a destructive
-'     choice). It returns 0 if the box already holds CMESSAGEBOX_MAXBUTTONS.
+'     choice). It returns 0 if the box already holds PSMESSAGEBOX_MAXBUTTONS.
 '   The id is YOUR value and is what DoModal returns. It is never used as a command id.
 '   AddPreset adds a whole set AND sets the default button and the cancel id to match. It is
 '     additive, so calling it on a box that already has buttons is a host error.
@@ -706,16 +706,16 @@ declare sub      CMessageBox_SetBeep( byval hMsgBox as HWND, byval bBeep as bool
 '     focus -- unless SetFocusButton is called AFTER it.
 '   SetCancelID overrides what Esc / the X / Alt+F4 return. Unset, that is the LAST button's id.
 ' ----------------------------------------------------------------------------------------
-declare function CMessageBox_AddButton( byval hMsgBox as HWND, byval Text as DWSTRING, byval id as long ) as HWND
-declare sub      CMessageBox_AddPreset( byval hMsgBox as HWND, byval nPreset as long )
-declare function CMessageBox_GetButtonCount( byval hMsgBox as HWND ) as long
-declare function CMessageBox_GetButtonHandle( byval hMsgBox as HWND, byval idx as long ) as HWND
-declare function CMessageBox_GetDefaultButton( byval hMsgBox as HWND ) as long
-declare sub      CMessageBox_SetDefaultButton( byval hMsgBox as HWND, byval idx as long )
-declare function CMessageBox_GetFocusButton( byval hMsgBox as HWND ) as long
-declare sub      CMessageBox_SetFocusButton( byval hMsgBox as HWND, byval idx as long )
-declare function CMessageBox_GetCancelID( byval hMsgBox as HWND ) as long
-declare sub      CMessageBox_SetCancelID( byval hMsgBox as HWND, byval id as long )
+declare function PsMessageBox_AddButton( byval hMsgBox as HWND, byval Text as DWSTRING, byval id as long ) as HWND
+declare sub      PsMessageBox_AddPreset( byval hMsgBox as HWND, byval nPreset as long )
+declare function PsMessageBox_GetButtonCount( byval hMsgBox as HWND ) as long
+declare function PsMessageBox_GetButtonHandle( byval hMsgBox as HWND, byval idx as long ) as HWND
+declare function PsMessageBox_GetDefaultButton( byval hMsgBox as HWND ) as long
+declare sub      PsMessageBox_SetDefaultButton( byval hMsgBox as HWND, byval idx as long )
+declare function PsMessageBox_GetFocusButton( byval hMsgBox as HWND ) as long
+declare sub      PsMessageBox_SetFocusButton( byval hMsgBox as HWND, byval idx as long )
+declare function PsMessageBox_GetCancelID( byval hMsgBox as HWND ) as long
+declare sub      PsMessageBox_SetCancelID( byval hMsgBox as HWND, byval id as long )
 
 ' ----------------------------------------------------------------------------------------
 ' Layout.  ALL setters take RAW PIXELS -- the caller DPI-scales (the family rule; only the
@@ -726,30 +726,30 @@ declare sub      CMessageBox_SetCancelID( byval hMsgBox as HWND, byval id as lon
 '     more room than that, the box is wider. Text is what the maximum constrains.
 '   SetMinWidth is a floor on the whole box.
 '   GetIdealSize forces a pending layout and returns the measured size of the whole box. Like
-'     CButton's, it is valid BEFORE the window has ever been sized -- which here is load-bearing,
+'     PsButton's, it is valid BEFORE the window has ever been sized -- which here is load-bearing,
 '     because DoModal sizes the window FROM it.
 '   The rect queries force a pending layout, so results are always current. They return FALSE if
 '     the box has no geometry yet. An absent part's rect is EMPTY and the query still returns
 '     TRUE -- empty is the honest answer.
 ' ----------------------------------------------------------------------------------------
-declare sub      CMessageBox_SetMaxWidth( byval hMsgBox as HWND, byval nMaxWidth as long )
-declare sub      CMessageBox_SetMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
-declare sub      CMessageBox_SetCaptionHeight( byval hMsgBox as HWND, byval nHeight as long )
-declare sub      CMessageBox_SetBodyPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
-declare sub      CMessageBox_SetFooterPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
-declare sub      CMessageBox_SetIconSize( byval hMsgBox as HWND, byval nIconWidth as long, byval nIconHeight as long )
-declare sub      CMessageBox_SetIconGap( byval hMsgBox as HWND, byval nGap as long )
-declare sub      CMessageBox_SetButtonGap( byval hMsgBox as HWND, byval nGap as long )
-declare sub      CMessageBox_SetButtonMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
-declare sub      CMessageBox_SetBorderThickness( byval hMsgBox as HWND, byval nThickness as long )
-declare sub      CMessageBox_GetIdealSize( byval hMsgBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
-declare function CMessageBox_GetCaptionRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetCloseRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetBodyRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetIconRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetTextRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetFooterRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-declare function CMessageBox_GetButtonRect( byval hMsgBox as HWND, byval idx as long, byref rc as RECT ) as boolean
+declare sub      PsMessageBox_SetMaxWidth( byval hMsgBox as HWND, byval nMaxWidth as long )
+declare sub      PsMessageBox_SetMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
+declare sub      PsMessageBox_SetCaptionHeight( byval hMsgBox as HWND, byval nHeight as long )
+declare sub      PsMessageBox_SetBodyPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
+declare sub      PsMessageBox_SetFooterPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
+declare sub      PsMessageBox_SetIconSize( byval hMsgBox as HWND, byval nIconWidth as long, byval nIconHeight as long )
+declare sub      PsMessageBox_SetIconGap( byval hMsgBox as HWND, byval nGap as long )
+declare sub      PsMessageBox_SetButtonGap( byval hMsgBox as HWND, byval nGap as long )
+declare sub      PsMessageBox_SetButtonMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
+declare sub      PsMessageBox_SetBorderThickness( byval hMsgBox as HWND, byval nThickness as long )
+declare sub      PsMessageBox_GetIdealSize( byval hMsgBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
+declare function PsMessageBox_GetCaptionRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetCloseRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetBodyRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetIconRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetTextRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetFooterRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+declare function PsMessageBox_GetButtonRect( byval hMsgBox as HWND, byval idx as long, byref rc as RECT ) as boolean
 
 ' ----------------------------------------------------------------------------------------
 ' Appearance.  SetColors copies the whole struct. GetColors fills one out, so the
@@ -770,17 +770,17 @@ declare function CMessageBox_GetButtonRect( byval hMsgBox as HWND, byval idx as 
 '                    comically large X if that font was sized for the icon. Two handles, because
 '                    this family never creates fonts and so cannot derive a smaller one itself.
 ' ----------------------------------------------------------------------------------------
-declare sub      CMessageBox_GetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
-declare sub      CMessageBox_SetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
-declare sub      CMessageBox_SetButtonColors( byval hMsgBox as HWND, byval pColors as CBUTTON_COLORS ptr )
-declare function CMessageBox_GetFont( byval hMsgBox as HWND ) as HFONT
-declare sub      CMessageBox_SetFont( byval hMsgBox as HWND, byval hTextFont as HFONT )
-declare function CMessageBox_GetCaptionFont( byval hMsgBox as HWND ) as HFONT
-declare sub      CMessageBox_SetCaptionFont( byval hMsgBox as HWND, byval hCaptionFont as HFONT )
-declare function CMessageBox_GetGlyphFont( byval hMsgBox as HWND ) as HFONT
-declare sub      CMessageBox_SetGlyphFont( byval hMsgBox as HWND, byval hGlyphFont as HFONT )
-declare function CMessageBox_GetCloseGlyphFont( byval hMsgBox as HWND ) as HFONT
-declare sub      CMessageBox_SetCloseGlyphFont( byval hMsgBox as HWND, byval hCloseFont as HFONT )
+declare sub      PsMessageBox_GetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
+declare sub      PsMessageBox_SetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
+declare sub      PsMessageBox_SetButtonColors( byval hMsgBox as HWND, byval pColors as PSBUTTON_COLORS ptr )
+declare function PsMessageBox_GetFont( byval hMsgBox as HWND ) as HFONT
+declare sub      PsMessageBox_SetFont( byval hMsgBox as HWND, byval hTextFont as HFONT )
+declare function PsMessageBox_GetCaptionFont( byval hMsgBox as HWND ) as HFONT
+declare sub      PsMessageBox_SetCaptionFont( byval hMsgBox as HWND, byval hCaptionFont as HFONT )
+declare function PsMessageBox_GetGlyphFont( byval hMsgBox as HWND ) as HFONT
+declare sub      PsMessageBox_SetGlyphFont( byval hMsgBox as HWND, byval hGlyphFont as HFONT )
+declare function PsMessageBox_GetCloseGlyphFont( byval hMsgBox as HWND ) as HFONT
+declare sub      PsMessageBox_SetCloseGlyphFont( byval hMsgBox as HWND, byval hCloseFont as HFONT )
 
 ' ----------------------------------------------------------------------------------------
 ' Callbacks.  See the type declarations above for each signature and contract.
@@ -789,8 +789,8 @@ declare sub      CMessageBox_SetCloseGlyphFont( byval hMsgBox as HWND, byval hCl
 '   MessageCallback - observe messages; TRUE suppresses the box's default handling (IGNORED for
 '                     WM_LBUTTONUP, WM_CLOSE and WM_DESTROY).
 ' ----------------------------------------------------------------------------------------
-declare sub      CMessageBox_SetPaintCallback( byval hMsgBox as HWND, byval usersub as MBX_PaintCallbackSub )
-declare sub      CMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval userfunc as MBX_MessageCallbackFunc )
+declare sub      PsMessageBox_SetPaintCallback( byval hMsgBox as HWND, byval usersub as MBX_PaintCallbackSub )
+declare sub      PsMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval userfunc as MBX_MessageCallbackFunc )
 
 ' ----------------------------------------------------------------------------------------
 ' Plumbing.
@@ -799,22 +799,22 @@ declare sub      CMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval us
 '                 distinct colours land inside one of its rects (capped at 64). Nothing in the
 '                 control calls it; it exists to make one specific defect measurable.
 '
-'                 THE DEFECT: CBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
+'                 THE DEFECT: PsBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
 '                 callback that reaches for it to draw the window outline or the footer divider
 '                 floods everything beneath and the box renders as one solid block. That has
-'                 shipped three times in this family (CToggle, CComboBox, CNumericUpDown), every
+'                 shipped three times in this family (PsToggle, PsComboBox, PsNumericUpDown), every
 '                 time from a copied callback, and it survives a glance because the flood colour
 '                 is a real colour from the control. A wiped part is literally ONE tone, so
 '                 "count > 1" is an unambiguous assertion where a screenshot is a judgement.
 '
 '                 A HOST THAT WRITES ITS OWN PaintCallback SHOULD ASSERT THIS. That is why it is
-'                 public rather than private to the self-test (CButton's precedent).
+'                 public rather than private to the self-test (PsButton's precedent).
 '
 '                 The PAINTINFO is built by the same routine WM_PAINT uses, because a probe that
 '                 hand-builds that struct and leaves one field zeroed silently skips the thing it
 '                 is measuring -- that produced a near-miss false PASS the first time this was
-'                 written for CButton (Learnings.md). Returns 0 if the box has no geometry yet,
-'                 so call it AFTER CMessageBox_LayoutForTest.
+'                 written for PsButton (Learnings.md). Returns 0 if the box has no geometry yet,
+'                 so call it AFTER PsMessageBox_LayoutForTest.
 '
 '   LayoutForTest - size the box to its ideal size WITHOUT showing it or entering the modal
 '                 loop, so geometry can be asserted and the tone probe can run. There is no
@@ -822,9 +822,9 @@ declare sub      CMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval us
 '                 the client area is only established by DoModal.
 '
 '   RunSelfTest - geometry, icon-resolution, cancel/focus-resolution and tab-navigability
-'                 assertions, gated on the CMESSAGEBOX_SELFTEST env var. Call it from the host
+'                 assertions, gated on the PSMESSAGEBOX_SELFTEST env var. Call it from the host
 '                 before the message loop. It never enters a modal loop.
 ' ----------------------------------------------------------------------------------------
-declare sub      CMessageBox_LayoutForTest( byval hMsgBox as HWND )
-declare function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as long ) as long
-declare sub      CMessageBox_RunSelfTest( byval hWndParent as HWND )
+declare sub      PsMessageBox_LayoutForTest( byval hMsgBox as HWND )
+declare function PsMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as long ) as long
+declare sub      PsMessageBox_RunSelfTest( byval hWndParent as HWND )

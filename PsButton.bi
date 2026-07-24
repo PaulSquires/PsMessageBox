@@ -1,42 +1,42 @@
 ''
-''  CButton.bi  --  owner-drawn command button (glyph + caption + glyph)
+''  PsButton.bi  --  owner-drawn command button (glyph + caption + glyph)
 ''
 
 #pragma once
 
-' ONE THING CBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
+' ONE THING PsBufferPaint COSTS THE HOST: GDI+'s Status enum defines Ok = 0 in namespace
 ' AfxNova, and every host in this family says "using AfxNova" -- so ANY identifier named "ok"
 ' becomes a duplicate definition. The family convention is bOK.
-#include once "CBufferPaint.bi"
+#include once "PsBufferPaint.bi"
 
 ' Polling timer that guarantees hot-tracking is cleared when the mouse leaves the control.
 ' WM_MOUSELEAVE (TME_LEAVE) is not reliably delivered on fast exits, so a periodic cursor
 ' check acts as a safety net. Timer IDs are per-window, so every instance can share this id.
 #define IDT_CBUTTON_HOTTRACK   &hCB90
-#define CBUTTON_HOTTRACK_MS    100
+#define PSBUTTON_HOTTRACK_MS    100
 
 ' Default geometry. Everything except the two THICKNESS values is DPI-scaled once at Create;
 ' every setter afterwards takes raw pixels and the caller scales (the family rule).
-#define CBUTTON_DEFAULT_PADLEFT     12
-#define CBUTTON_DEFAULT_PADRIGHT    12
-#define CBUTTON_DEFAULT_PADTOP       6
-#define CBUTTON_DEFAULT_PADBOTTOM    6
+#define PSBUTTON_DEFAULT_PADLEFT     12
+#define PSBUTTON_DEFAULT_PADRIGHT    12
+#define PSBUTTON_DEFAULT_PADTOP       6
+#define PSBUTTON_DEFAULT_PADBOTTOM    6
 ' Gap between an icon cell and the caption. Spent ONLY when there is a caption to separate
 ' the icon from -- an icon-only button charges padding + icon + padding and nothing else.
-#define CBUTTON_DEFAULT_ICONGAP      8
-' The icon cell. DECLARED, never measured (CIconPanel's rule): the glyph font is a paint-time
+#define PSBUTTON_DEFAULT_ICONGAP      8
+' The icon cell. DECLARED, never measured (PsIconPanel's rule): the glyph font is a paint-time
 ' input, so a font too large for the cell simply clips rather than resizing the button.
-#define CBUTTON_DEFAULT_ICONWIDTH   16
-#define CBUTTON_DEFAULT_ICONHEIGHT  16
+#define PSBUTTON_DEFAULT_ICONWIDTH   16
+#define PSBUTTON_DEFAULT_ICONHEIGHT  16
 ' Corner curvature of the button chrome. This is an ellipse DIAMETER, not a radius --
-' CBufferPaint keeps GDI's vocabulary and halves it internally, so 12 draws a 6px radius.
+' PsBufferPaint keeps GDI's vocabulary and halves it internally, so 12 draws a 6px radius.
 ' Thirteen controls pass GDI-flavoured numbers there; do not "fix" it to a radius here.
-#define CBUTTON_DEFAULT_CURVATURE   12
-' The button reads BORDERLESS out of the box (see CBUTTON_COLORS), so a border thickness of 1
+#define PSBUTTON_DEFAULT_CURVATURE   12
+' The button reads BORDERLESS out of the box (see PSBUTTON_COLORS), so a border thickness of 1
 ' costs nothing until a host sets a contrasting BorderColor. Zero disables it outright.
-#define CBUTTON_DEFAULT_BORDERTHICK  1     ' not DPI-scaled
-#define CBUTTON_DEFAULT_FOCUSGAP     2
-#define CBUTTON_DEFAULT_FOCUSTHICK   1     ' not DPI-scaled
+#define PSBUTTON_DEFAULT_BORDERTHICK  1     ' not DPI-scaled
+#define PSBUTTON_DEFAULT_FOCUSGAP     2
+#define PSBUTTON_DEFAULT_FOCUSTHICK   1     ' not DPI-scaled
 
 
 ' Where the caption sits in the span between the two icon cells.
@@ -44,16 +44,16 @@
 ' NOTE WHAT THIS DOES NOT DO. The icon cells are PINNED to the padding and are never moved by
 ' the alignment -- so with a left icon and BTN_ALIGN_CENTER the caption is centred on the
 ' LEFTOVER span, not on the button. That is the layout model this control was designed to
-' (CComboBox pins its chevron exactly this way); a host that wants the icon to hug a centred
-' caption wants the block-centring CSelectBar does, which is a different control.
+' (PsComboBox pins its chevron exactly this way); a host that wants the icon to hug a centred
+' caption wants the block-centring PsSelectBar does, which is a different control.
 enum
     BTN_ALIGN_LEFT = 0
     BTN_ALIGN_CENTER
     BTN_ALIGN_RIGHT
 end enum
 
-' Which of the four colour sets the painter uses. Produced by CButton_ResolveMood, which is a
-' PURE FUNCTION precisely so its truth table can be asserted (CScrollPanel_ShouldShow's
+' Which of the four colour sets the painter uses. Produced by PsButton_ResolveMood, which is a
+' PURE FUNCTION precisely so its truth table can be asserted (PsScrollPanel_ShouldShow's
 ' precedent) rather than only inspected inside a paint.
 '
 ' isDefault is deliberately NOT a mood. It overlays one colour -- the border -- on top of
@@ -65,7 +65,7 @@ enum
     BTN_MOOD_DISABLED
 end enum
 
-' Which rect CButton_CountRenderedTones looks at. See that function for why it exists.
+' Which rect PsButton_CountRenderedTones looks at. See that function for why it exists.
 enum
     BTN_PART_BUTTON = 0
     BTN_PART_TEXT
@@ -76,21 +76,21 @@ end enum
 
 ' Colors for the built-in painter. Copied on Set.
 '
-' FOUR MOODS, precedence  disabled > pressed > hot > idle.  Unlike CToggle and CSelectBar --
+' FOUR MOODS, precedence  disabled > pressed > hot > idle.  Unlike PsToggle and PsSelectBar --
 ' which render a press as hot -- this control has a real PRESSED set, because a command
 ' button's press is the one piece of feedback the user relies on to know the click registered,
-' and unlike CComboBox (where "pressed" and "open" are the same instant) the held-down state
+' and unlike PsComboBox (where "pressed" and "open" are the same instant) the held-down state
 ' here genuinely lasts as long as the finger does.
 '
 ' THE BUTTON READS BORDERLESS BY DEFAULT because every BorderColorXxx is defaulted EQUAL to the
-' matching BackColorXxx -- the same trick CComboBox uses, CToggle uses for its ON pill and
-' CSelectBar for its hot cell. A host that wants a visible outline just sets the four fields.
+' matching BackColorXxx -- the same trick PsComboBox uses, PsToggle uses for its ON pill and
+' PsSelectBar for its hot cell. A host that wants a visible outline just sets the four fields.
 '
 ' THE ICON FOLLOWS THE CAPTION BY DEFAULT for the same reason: each IconColorXxx is defaulted
 ' EQUAL to the matching ForeColorXxx. Set them to break that coupling (a red record dot on an
 ' otherwise grey button).
 '
-' THE PRESSED PAIR IS THE THEME'S SELECT PAIR, which is CIconPanel's call -- its
+' THE PRESSED PAIR IS THE THEME'S SELECT PAIR, which is PsIconPanel's call -- its
 ' BackColorSelect doubles as the press flash. A press therefore reads as an accent push rather
 ' than as a darkening, and it is the one mood whose border is visible out of the box only
 ' because its fill is.
@@ -98,7 +98,7 @@ end enum
 ' DefaultBorderColor is the ONLY colour here that is not part of a mood. It replaces whatever
 ' border the resolved mood would have used, which is what makes "the default button" a single
 ' visible outline on an otherwise borderless button.
-type CBUTTON_COLORS
+type PSBUTTON_COLORS
     ' --- idle ---
     BackColor           as COLORREF = BGR( 44, 49, 58)
     ForeColor           as COLORREF = BGR(200,205,214)
@@ -128,9 +128,9 @@ end type
 ' Everything the painter needs. All five rects are precomputed by LayoutButton -- never
 ' re-derive one from another, and in particular never re-apply the padding to rcButton to get
 ' rcText, because the icon cells and the icon gap can change underneath you.
-type CBUTTON_PAINTINFO
+type PSBUTTON_PAINTINFO
     hButton       as HWND              ' the control, so the callback can query it
-    b             as CBufferPaint ptr  ' the control's buffer for this repaint (no copy)
+    b             as PsBufferPaint ptr  ' the control's buffer for this repaint (no copy)
     ' --- Geometry, all precomputed by LayoutButton ---
     rcClient      as RECT              ' the whole client area
     rcButton      as RECT              ' the chrome: rcClient deflated by the focus-ring band
@@ -159,7 +159,7 @@ type CBUTTON_PAINTINFO
     nTextAlign    as long              ' BTN_ALIGN_*; map it to DT_LEFT / DT_CENTER / DT_RIGHT
 end type
 
-type CBUTTON_MESSAGEINFO
+type PSBUTTON_MESSAGEINFO
     hButton    as HWND
     uMsg       as UINT
     wParam     as WPARAM
@@ -175,53 +175,53 @@ end type
 ' background.
 '
 ' TWO CONTRACTS WORTH HONOURING:
-'   - Draw the caption with the SAME font you handed to CButton_SetFont. The button width was
+'   - Draw the caption with the SAME font you handed to PsButton_SetFont. The button width was
 '     measured with it, and a different font means the width lies.
 '   - DO NOT reach for PaintBorderRect to draw a frame. It FILLS unconditionally, so used as an
 '     outline it erases everything beneath it -- a mistake this family has now made three
-'     separate times (CToggle, CComboBox, CNumericUpDown), every time by copying a sibling's
+'     separate times (PsToggle, PsComboBox, PsNumericUpDown), every time by copying a sibling's
 '     callback. PaintRoundOutline is the one that strokes without filling.
-type BTN_PaintCallbackSub as sub( byval p as CBUTTON_PAINTINFO ptr )
+type BTN_PaintCallbackSub as sub( byval p as PSBUTTON_PAINTINFO ptr )
 
 ' Observe messages. Return TRUE if you handled it and want the control's default handling
 ' suppressed, FALSE to let it proceed.
 '
-' Like CToggle and CComboBox -- and unlike the mouse-only siblings -- this control hands over
+' Like PsToggle and PsComboBox -- and unlike the mouse-only siblings -- this control hands over
 ' the FOCUS and KEYBOARD messages as well as the mouse ones, because they carry real state.
 '
 ' CAUTION: the result is IGNORED for three messages.
 '   WM_LBUTTONUP        - the control holds mouse capture across a press and the up-message is
 '                         what releases it: a callback that suppressed it would strand capture
-'                         and route every subsequent click to this control (the CListBox bug
+'                         and route every subsequent click to this control (the PsListBox bug
 '                         recorded in Learnings.md). Suppressing WM_LBUTTONDOWN suppresses the
 '                         press, never the capture bookkeeping.
-'                         NOTE this reverses CComboBox's contract, which the file was seeded
+'                         NOTE this reverses PsComboBox's contract, which the file was seeded
 '                         from -- that control takes no capture and honours the result here.
 '   WM_SETFOCUS         - focus is a FACT the system reports, not an action to veto. The state
 '   WM_KILLFOCUS          is already updated by the time you are called; there is nothing left
 '                         to suppress. A host that does not want the control focusable must not
 '                         make it a tabstop.
 ' For every other message TRUE suppresses the control's default handling.
-type BTN_MessageCallbackFunc as function( byval m as CBUTTON_MESSAGEINFO ptr ) as boolean
+type BTN_MessageCallbackFunc as function( byval m as PSBUTTON_MESSAGEINFO ptr ) as boolean
 
 ' Supply the tooltip text on demand (only when a tip is about to show). Consulted ONLY when the
 ' control has no tooltip text of its own. Return "" for no tooltip.
 '
 ' THERE IS NO CAPTION FALLBACK. A button whose caption is already on screen would otherwise pop
 ' a tip that just repeats what you are looking at, so a control with neither its own text nor a
-' callback answer simply shows nothing. (CStatusBar and CTabBar do fall back to the caption;
+' callback answer simply shows nothing. (PsStatusBar and PsTabBar do fall back to the caption;
 ' that is their call, made for controls whose text is often truncated.)
 type BTN_TooltipCallbackFunc as function( byval hButton as HWND ) as DWSTRING
 
 ' The button was clicked: a matched press+release with the cursor still inside, or Space/Enter
 ' while focused. Nothing fires for a cancelled gesture (press, slide off, release).
 '
-' Unlike the family's state callbacks this one ALSO fires for the programmatic CButton_Click --
+' Unlike the family's state callbacks this one ALSO fires for the programmatic PsButton_Click --
 ' see that function for why an action is not a setter.
 type BTN_ClickCallbackSub as sub( byval hButton as HWND, byval id as long )
 
 
-type CBUTTON
+type PSBUTTON
     hWin            as HWND
     hToolTip        as HWND
     ' Instance-lifetime buffer that TTN_GETDISPINFOW's lpszText is pointed at. It must NOT be
@@ -245,7 +245,7 @@ type CBUTTON
     isHot           as boolean = false  ' the mouse is over the client
     isFocused       as boolean = false
     isPressed       as boolean = false  ' a live left press (see the capture note below)
-    isDefault       as boolean = false  ' appearance only -- see CButton_SetDefault
+    isDefault       as boolean = false  ' appearance only -- see PsButton_SetDefault
     hotTimerOn      as boolean = false  ' is the hot-tracking safety-net timer running?
     ' --- Press state (mouse capture). The control TAKES capture on a press: the press/cancel
     '     gesture (press, slide off the button, release, nothing happens) consumes the
@@ -256,33 +256,33 @@ type CBUTTON
     '     callback may suppress an up-message.
     '     There is no bPressedInside flag: "the cursor is still inside" is exactly isHot, and
     '     hover tracking already maintains that through the capture. ---
-    colors          as CBUTTON_COLORS
+    colors          as PSBUTTON_COLORS
     ' Caller-supplied fonts (caller owns both). NOT named hFont: FreeBASIC is case-insensitive,
     ' so a member called hFont would shadow the TYPE name HFONT inside every member procedure
     ' of this type, and "dim as HFONT x" there fails with a misleading "error 14: Expected
     ' identifier, found 'HFONT'". See C:\dev\Learnings.md.
     '
     ' TWO fonts, because the caption font is never the icon font. hTextFont is the MEASURING
-    ' font and drives the layout; hGlyphFont is a paint-time input only (CIconPanel's rule) and
+    ' font and drives the layout; hGlyphFont is a paint-time input only (PsIconPanel's rule) and
     ' changing it repaints without re-laying-out.
     hTextFont       as HFONT
     hGlyphFont      as HFONT
     ' --- Layout inputs. All pixels; DPI-scaled once at Create, raw thereafter. ---
     nTextAlign      as long = BTN_ALIGN_CENTER
     bAutoSize       as boolean = false   ' opt-in: the control SetWindowPos's ITSELF
-    nPadLeft        as long = CBUTTON_DEFAULT_PADLEFT
-    nPadRight       as long = CBUTTON_DEFAULT_PADRIGHT
-    nPadTop         as long = CBUTTON_DEFAULT_PADTOP
-    nPadBottom      as long = CBUTTON_DEFAULT_PADBOTTOM
-    nIconGap        as long = CBUTTON_DEFAULT_ICONGAP
+    nPadLeft        as long = PSBUTTON_DEFAULT_PADLEFT
+    nPadRight       as long = PSBUTTON_DEFAULT_PADRIGHT
+    nPadTop         as long = PSBUTTON_DEFAULT_PADTOP
+    nPadBottom      as long = PSBUTTON_DEFAULT_PADBOTTOM
+    nIconGap        as long = PSBUTTON_DEFAULT_ICONGAP
     ' NOTE: "width" is a FreeBASIC reserved word (see C:\dev\Learnings.md) and produces errors
     ' that never name the real problem -- hence nIconWidth throughout.
-    nIconWidth      as long = CBUTTON_DEFAULT_ICONWIDTH
-    nIconHeight     as long = CBUTTON_DEFAULT_ICONHEIGHT
-    nCurvature      as long = CBUTTON_DEFAULT_CURVATURE     ' ellipse DIAMETER
-    nBorderThick    as long = CBUTTON_DEFAULT_BORDERTHICK   ' NOT DPI-scaled
-    nFocusGap       as long = CBUTTON_DEFAULT_FOCUSGAP
-    nFocusThick     as long = CBUTTON_DEFAULT_FOCUSTHICK    ' NOT DPI-scaled
+    nIconWidth      as long = PSBUTTON_DEFAULT_ICONWIDTH
+    nIconHeight     as long = PSBUTTON_DEFAULT_ICONHEIGHT
+    nCurvature      as long = PSBUTTON_DEFAULT_CURVATURE     ' ellipse DIAMETER
+    nBorderThick    as long = PSBUTTON_DEFAULT_BORDERTHICK   ' NOT DPI-scaled
+    nFocusGap       as long = PSBUTTON_DEFAULT_FOCUSGAP
+    nFocusThick     as long = PSBUTTON_DEFAULT_FOCUSTHICK    ' NOT DPI-scaled
     ' --- Layout outputs. Rects are DERIVED, never set from outside; LayoutButton() owns them.
     '     Layout is lazy: mutators mark it dirty, the next paint (or any rect/size query) runs
     '     it, which coalesces a burst of mutations into ONE measuring pass. ---
@@ -292,7 +292,7 @@ type CBUTTON
     nIdealH         as long = 0     ' derived
     rcButton        as RECT         ' derived
     rcIconLeft      as RECT         ' derived
-    rcText          as RECT         ' derived -- the SPAN, see CBUTTON_PAINTINFO
+    rcText          as RECT         ' derived -- the SPAN, see PSBUTTON_PAINTINFO
     rcIconRight     as RECT         ' derived
     rcVisual        as RECT         ' derived
     bLayoutDirty    as boolean = true
@@ -314,23 +314,23 @@ end type
 ' The distance the visual bounds extend beyond the button chrome on every side. The focus ring
 ' is drawn INSIDE this band, and the band is reserved UNCONDITIONALLY -- whether or not the
 ' control currently has focus -- which is what stops the button jumping when focus arrives. It
-' therefore contributes to the IDEAL SIZE (CToggle's rule).
-function CBUTTON.RingPad() as long
+' therefore contributes to the IDEAL SIZE (PsToggle's rule).
+function PSBUTTON.RingPad() as long
     return this.nFocusGap + this.nFocusThick
 end function
 
 ' The three "is this part present at all" tests. They exist as named members rather than inline
 ' len() checks because the layout, the painter and the ideal-size arithmetic must all agree
 ' about which parts exist, and three copies of `len(x) > 0` is three places to disagree.
-function CBUTTON.HasText() as boolean
+function PSBUTTON.HasText() as boolean
     return (len( this.wszText ) > 0)
 end function
 
-function CBUTTON.HasIconLeft() as boolean
+function PSBUTTON.HasIconLeft() as boolean
     return (len( this.wszGlyphLeft ) > 0)
 end function
 
-function CBUTTON.HasIconRight() as boolean
+function PSBUTTON.HasIconRight() as boolean
     return (len( this.wszGlyphRight ) > 0)
 end function
 
@@ -338,13 +338,13 @@ end function
 ' Forget any live press WITHOUT touching the capture. Releasing capture is the WndProc's job,
 ' and only on the up-message or WM_DESTROY -- doing it here would let a callback strand or
 ' double-release it.
-sub CBUTTON.CancelPress()
+sub PSBUTTON.CancelPress()
     this.isPressed = false
 end sub
 
 ' Mark the layout stale and request a repaint. Every mutator routes through here, which is what
 ' makes layout lazy: a burst of setters costs one measuring pass, not N.
-sub CBUTTON.Refresh()
+sub PSBUTTON.Refresh()
     this.bLayoutDirty = true
     ' Repaint WITH background erase so a region vacated by a shrinking button is cleared.
     if this.hWin then InvalidateRect( this.hWin, NULL, TRUE )
@@ -374,7 +374,7 @@ end sub
 ' THE GAP IS SPENT ONLY WHEN THERE IS A CAPTION TO SEPARATE FROM. An icon-only button charges
 ' padLeft + icon + padRight, so the glyph sits properly centred in its own padding instead of
 ' being pushed off-centre by a gap with nothing on the other side of it. Same reasoning as
-' CComboBox's arrow-only mode.
+' PsComboBox's arrow-only mode.
 '
 ' AN ABSENT PART GIVES AN EMPTY RECT, not a zero-width one tucked against an edge. A paint
 ' callback can therefore test IsRectEmpty rather than having to re-derive presence from the
@@ -386,16 +386,16 @@ end sub
 ' rather than having a phantom text height baked in here.
 '
 ' WHY THE MEASURING PASS RUNS BEFORE THE ZERO-CLIENT BAIL: nIdealW/nIdealH do not depend on the
-' client area at all, and CButton_GetIdealSize is exactly what a host calls to decide how big to
+' client area at all, and PsButton_GetIdealSize is exactly what a host calls to decide how big to
 ' make the control in the FIRST place. Returning 0 until it had already been sized would be a
-' chicken-and-egg trap (CComboBox dodges it by this same ordering).
+' chicken-and-egg trap (PsComboBox dodges it by this same ordering).
 '
 ' OVERFLOW: when the client is smaller than ideal the rects are computed HONESTLY rather than
-' squeezed (CIconPanel's and CTabBar's rule) -- the icons keep their size and stay pinned to
+' squeezed (PsIconPanel's and PsTabBar's rule) -- the icons keep their size and stay pinned to
 ' their padding, and rcText is what collapses, clamped to EMPTY rather than going negative. So
 ' a too-narrow button loses its caption to the ellipsis and keeps its icons, which is the
 ' useful failure. Vertically a client shorter than contentH clips rather than deforming.
-sub CBUTTON.LayoutButton()
+sub PSBUTTON.LayoutButton()
     this.bLayoutDirty = false
     if this.hWin = 0 then exit sub
 
@@ -518,10 +518,10 @@ end sub
 ' Which colour set does this state call for?  disabled > pressed > hot > idle.
 '
 ' A PURE FUNCTION on purpose: it takes no control pointer and touches no global, so its whole
-' truth table can be asserted directly (CScrollPanel_ShouldShow's precedent) instead of only
+' truth table can be asserted directly (PsScrollPanel_ShouldShow's precedent) instead of only
 ' being observable from inside a WM_PAINT. The painter and the self-test call the same one.
 ' ========================================================================================
-function CButton_ResolveMood( _
+function PsButton_ResolveMood( _
             byval isEnabled as boolean, _
             byval isPressed as boolean, _
             byval isHot     as boolean _
@@ -537,13 +537,13 @@ end function
 ' ========================================================================================
 ' Turn a mood (plus the default-button flag) into the four colours the painter uses.
 '
-' Split out of the painter for the same reason as CButton_ResolveMood: the isDefault border
+' Split out of the painter for the same reason as PsButton_ResolveMood: the isDefault border
 ' overlay has to hold in EVERY mood, and that is a claim worth asserting rather than eyeballing
 ' in four screenshots. The overlay is applied LAST and unconditionally, which is what makes it
 ' one rule rather than four.
 ' ========================================================================================
-sub CButton_ResolveColors( _
-            byval pColors   as CBUTTON_COLORS ptr, _
+sub PsButton_ResolveColors( _
+            byval pColors   as PSBUTTON_COLORS ptr, _
             byval nMood     as long, _
             byval isDefault as boolean, _
             byref clrBack   as COLORREF, _
@@ -594,8 +594,8 @@ end sub
 '
 ' IT DOES NOT LATCH, AND THERE IS NO isSelected
 '   Every state this control has is transient (hot, pressed, focused) or host-owned (enabled,
-'   default). A toolbar-style latching button is CIconPanel's IP_KIND_TOGGLE and an on/off
-'   switch is CToggle; neither behaviour lives here, and the absence is a decision.
+'   default). A toolbar-style latching button is PsIconPanel's IP_KIND_TOGGLE and an on/off
+'   switch is PsToggle; neither behaviour lives here, and the absence is a decision.
 '
 ' isDefault IS APPEARANCE ONLY
 '   It draws DefaultBorderColor over whichever mood's border would have been used, and does
@@ -605,35 +605,35 @@ end sub
 '
 ' ICONS ARE GLYPHS FROM A FONT
 '   wszGlyphLeft / wszGlyphRight are Segoe Fluent Icons codepoints (or any font's), drawn with
-'   the SEPARATE font handed to CButton_SetGlyphFont. The cell is DECLARED by
-'   CButton_SetIconSize and never measured, so a glyph font too large for the cell clips rather
+'   the SEPARATE font handed to PsButton_SetGlyphFont. The cell is DECLARED by
+'   PsButton_SetIconSize and never measured, so a glyph font too large for the cell clips rather
 '   than resizing the button. There is no HICON path.
 '
 ' NO MNEMONICS
-'   "&Save" draws a literal ampersand -- CBufferPaint.PaintText forces DT_NOPREFIX, so this is
+'   "&Save" draws a literal ampersand -- PsBufferPaint.PaintText forces DT_NOPREFIX, so this is
 '   enforced by the renderer rather than merely intended. A host wanting Alt+S wires its own
-'   accelerator and calls CButton_Click().
+'   accelerator and calls PsButton_Click().
 '
 ' IT IS FOCUSABLE
-'   WS_TABSTOP, real focus tracking, a painted focus ring, and Space/Enter activation. CToggle
-'   and CComboBox are the other focusable siblings; the rest of the family is mouse-only. Tab
+'   WS_TABSTOP, real focus tracking, a painted focus ring, and Space/Enter activation. PsToggle
+'   and PsComboBox are the other focusable siblings; the rest of the family is mouse-only. Tab
 '   NAVIGATION needs IsDialogMessage in the host pump. Without it, mouse and -- once the control
 '   has focus -- keyboard both still work.
 '
 ' THERE IS NO PUMP OBLIGATION
-'   Unlike CComboBox, CNumericUpDown and CTextBox there is no CButton_FilterMessage: this
+'   Unlike PsComboBox, PsNumericUpDown and PsTextBox there is no PsButton_FilterMessage: this
 '   control owns no second top-level window and no popup, so nothing needs intercepting ahead of
 '   the dispatch.
 '
 ' THE CONTROL HANDLE
-'   Every CButton_* function takes the handle returned by CButton_Create(). It is a real HWND on
+'   Every PsButton_* function takes the handle returned by PsButton_Create(). It is a real HWND on
 '   purpose (not an opaque type): callers legitimately need to treat the control as a window,
 '   e.g. SetWindowPos() to place and size it.
 '
-' THERE IS NO CButton_HitTest
+' THERE IS NO PsButton_HitTest
 '   The whole client rect is the hit area, so a hit test could only ever be PtInRect(client) --
 '   a function that returns TRUE for exactly the points the caller already knows are inside.
-'   Its absence is a decision, not an omission (CToggle's reasoning).
+'   Its absence is a decision, not an omission (PsToggle's reasoning).
 '
 ' LIFETIME
 '   The control frees itself when its window is destroyed, and destroys its tooltip with it. The
@@ -643,10 +643,10 @@ end sub
 ' Creation
 '   CtrlID becomes the control window's id (GWLP_ID), so hosts can find it with GetDlgItem.
 '   There are no child controls. The control is created zero-sized: size it with
-'   CButton_GetIdealSize and position it with SetWindowPos() -- or turn on CButton_SetAutoSize
+'   PsButton_GetIdealSize and position it with SetWindowPos() -- or turn on PsButton_SetAutoSize
 '   and let it size itself.
 ' ----------------------------------------------------------------------------------------
-declare function CButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
+declare function PsButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
 
 ' ----------------------------------------------------------------------------------------
 ' Content.  All of these are SILENT: they change what is drawn, never what was clicked.
@@ -661,16 +661,16 @@ declare function CButton_Create( byval hWndParent as HWND, byval CtrlID as long 
 '   SetID sets the value handed to ClickCallback. It is a HOST PAYLOAD and is never used as a
 '     command id by this control, so it cannot collide with anything.
 ' ----------------------------------------------------------------------------------------
-declare function CButton_GetText( byval hButton as HWND ) as DWSTRING
-declare sub      CButton_SetText( byval hButton as HWND, byval Text as DWSTRING )
-declare function CButton_GetGlyphLeft( byval hButton as HWND ) as DWSTRING
-declare sub      CButton_SetGlyphLeft( byval hButton as HWND, byval Glyph as DWSTRING )
-declare function CButton_GetGlyphRight( byval hButton as HWND ) as DWSTRING
-declare sub      CButton_SetGlyphRight( byval hButton as HWND, byval Glyph as DWSTRING )
-declare function CButton_GetID( byval hButton as HWND ) as long
-declare sub      CButton_SetID( byval hButton as HWND, byval id as long )
-declare function CButton_GetItemData( byval hButton as HWND ) as integer
-declare sub      CButton_SetItemData( byval hButton as HWND, byval itemData as integer )
+declare function PsButton_GetText( byval hButton as HWND ) as DWSTRING
+declare sub      PsButton_SetText( byval hButton as HWND, byval Text as DWSTRING )
+declare function PsButton_GetGlyphLeft( byval hButton as HWND ) as DWSTRING
+declare sub      PsButton_SetGlyphLeft( byval hButton as HWND, byval Glyph as DWSTRING )
+declare function PsButton_GetGlyphRight( byval hButton as HWND ) as DWSTRING
+declare sub      PsButton_SetGlyphRight( byval hButton as HWND, byval Glyph as DWSTRING )
+declare function PsButton_GetID( byval hButton as HWND ) as long
+declare sub      PsButton_SetID( byval hButton as HWND, byval id as long )
+declare function PsButton_GetItemData( byval hButton as HWND ) as integer
+declare sub      PsButton_SetItemData( byval hButton as HWND, byval itemData as integer )
 
 ' ----------------------------------------------------------------------------------------
 ' State.
@@ -682,19 +682,19 @@ declare sub      CButton_SetItemData( byval hButton as HWND, byval itemData as i
 '   SetDefault is appearance only -- see the header. It is SILENT and cheap; only the border
 '     colour changes, so it never re-measures.
 '   GetFocused answers for this window directly (there is no child to hold focus, unlike
-'     CNumericUpDown where GetFocus() = hCtrl is never true).
+'     PsNumericUpDown where GetFocus() = hCtrl is never true).
 ' ----------------------------------------------------------------------------------------
-declare function CButton_GetEnabled( byval hButton as HWND ) as boolean
-declare sub      CButton_SetEnabled( byval hButton as HWND, byval isEnabled as boolean )
-declare function CButton_GetFocused( byval hButton as HWND ) as boolean
-declare function CButton_GetDefault( byval hButton as HWND ) as boolean
-declare sub      CButton_SetDefault( byval hButton as HWND, byval isDefault as boolean )
-declare sub      CButton_Refresh( byval hButton as HWND )
+declare function PsButton_GetEnabled( byval hButton as HWND ) as boolean
+declare sub      PsButton_SetEnabled( byval hButton as HWND, byval isEnabled as boolean )
+declare function PsButton_GetFocused( byval hButton as HWND ) as boolean
+declare function PsButton_GetDefault( byval hButton as HWND ) as boolean
+declare sub      PsButton_SetDefault( byval hButton as HWND, byval isDefault as boolean )
+declare sub      PsButton_Refresh( byval hButton as HWND )
 
 ' ----------------------------------------------------------------------------------------
 ' Action.
 '
-'   CButton_Click FIRES ClickCallback, and that is a DELIBERATE EXCEPTION to the family's
+'   PsButton_Click FIRES ClickCallback, and that is a DELIBERATE EXCEPTION to the family's
 '   "programmatic setters are silent" rule. It is an ACTION, not a state setter -- Win32's
 '   BM_CLICK sends BN_CLICKED too -- and it is the door a host's accelerator uses now that this
 '   control parses no mnemonics. A silent version would have no purpose.
@@ -703,7 +703,7 @@ declare sub      CButton_Refresh( byval hButton as HWND )
 '   The call is refused on a disabled button, exactly as a real click would be. Note it does NOT
 '   paint a press flash: it reports an action, it does not animate one.
 ' ----------------------------------------------------------------------------------------
-declare sub      CButton_Click( byval hButton as HWND )
+declare sub      PsButton_Click( byval hButton as HWND )
 
 ' ----------------------------------------------------------------------------------------
 ' Layout.  ALL setters take RAW PIXELS -- the caller DPI-scales (the family rule; only the
@@ -716,7 +716,7 @@ declare sub      CButton_Click( byval hButton as HWND )
 '     that has an icon, and only when there IS a caption.
 '   SetIconSize is the declared cell for BOTH icons (they are always the same size). Nothing is
 '     measured, so this is the only thing that decides how much room a glyph gets.
-'   SetCornerCurvature takes an ellipse DIAMETER, not a radius: CBufferPaint keeps GDI's
+'   SetCornerCurvature takes an ellipse DIAMETER, not a radius: PsBufferPaint keeps GDI's
 '     vocabulary and halves it internally. 12 draws a 6px radius. 0 = square corners.
 '   SetFocusRing sets the gap from the chrome to the ring and the ring's own thickness. Both are
 '     reserved unconditionally, focused or not, so the button never jumps when focus arrives --
@@ -734,28 +734,28 @@ declare sub      CButton_Click( byval hButton as HWND )
 '   the control has no geometry yet (created but never sized). An absent part's rect is EMPTY
 '   and the query still returns TRUE -- empty is the honest answer.
 ' ----------------------------------------------------------------------------------------
-declare function CButton_GetTextAlign( byval hButton as HWND ) as long
-declare sub      CButton_SetTextAlign( byval hButton as HWND, byval nTextAlign as long )
-declare sub      CButton_GetPadding( byval hButton as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
-declare sub      CButton_SetPadding( byval hButton as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
-declare function CButton_GetIconGap( byval hButton as HWND ) as long
-declare sub      CButton_SetIconGap( byval hButton as HWND, byval nIconGap as long )
-declare sub      CButton_GetIconSize( byval hButton as HWND, byref nIconWidth as long, byref nIconHeight as long )
-declare sub      CButton_SetIconSize( byval hButton as HWND, byval nIconWidth as long, byval nIconHeight as long )
-declare function CButton_GetCornerCurvature( byval hButton as HWND ) as long
-declare sub      CButton_SetCornerCurvature( byval hButton as HWND, byval nCurvature as long )
-declare function CButton_GetBorderThickness( byval hButton as HWND ) as long
-declare sub      CButton_SetBorderThickness( byval hButton as HWND, byval nThickness as long )
-declare sub      CButton_GetFocusRing( byval hButton as HWND, byref nGap as long, byref nThickness as long )
-declare sub      CButton_SetFocusRing( byval hButton as HWND, byval nGap as long, byval nThickness as long )
-declare function CButton_GetAutoSize( byval hButton as HWND ) as boolean
-declare sub      CButton_SetAutoSize( byval hButton as HWND, byval bAutoSize as boolean )
-declare sub      CButton_GetIdealSize( byval hButton as HWND, byref nWidth as long, byref nHeight as long )
-declare function CButton_GetButtonRect( byval hButton as HWND, byref rc as RECT ) as boolean
-declare function CButton_GetTextRect( byval hButton as HWND, byref rc as RECT ) as boolean
-declare function CButton_GetIconLeftRect( byval hButton as HWND, byref rc as RECT ) as boolean
-declare function CButton_GetIconRightRect( byval hButton as HWND, byref rc as RECT ) as boolean
-declare function CButton_GetVisualRect( byval hButton as HWND, byref rc as RECT ) as boolean
+declare function PsButton_GetTextAlign( byval hButton as HWND ) as long
+declare sub      PsButton_SetTextAlign( byval hButton as HWND, byval nTextAlign as long )
+declare sub      PsButton_GetPadding( byval hButton as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
+declare sub      PsButton_SetPadding( byval hButton as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
+declare function PsButton_GetIconGap( byval hButton as HWND ) as long
+declare sub      PsButton_SetIconGap( byval hButton as HWND, byval nIconGap as long )
+declare sub      PsButton_GetIconSize( byval hButton as HWND, byref nIconWidth as long, byref nIconHeight as long )
+declare sub      PsButton_SetIconSize( byval hButton as HWND, byval nIconWidth as long, byval nIconHeight as long )
+declare function PsButton_GetCornerCurvature( byval hButton as HWND ) as long
+declare sub      PsButton_SetCornerCurvature( byval hButton as HWND, byval nCurvature as long )
+declare function PsButton_GetBorderThickness( byval hButton as HWND ) as long
+declare sub      PsButton_SetBorderThickness( byval hButton as HWND, byval nThickness as long )
+declare sub      PsButton_GetFocusRing( byval hButton as HWND, byref nGap as long, byref nThickness as long )
+declare sub      PsButton_SetFocusRing( byval hButton as HWND, byval nGap as long, byval nThickness as long )
+declare function PsButton_GetAutoSize( byval hButton as HWND ) as boolean
+declare sub      PsButton_SetAutoSize( byval hButton as HWND, byval bAutoSize as boolean )
+declare sub      PsButton_GetIdealSize( byval hButton as HWND, byref nWidth as long, byref nHeight as long )
+declare function PsButton_GetButtonRect( byval hButton as HWND, byref rc as RECT ) as boolean
+declare function PsButton_GetTextRect( byval hButton as HWND, byref rc as RECT ) as boolean
+declare function PsButton_GetIconLeftRect( byval hButton as HWND, byref rc as RECT ) as boolean
+declare function PsButton_GetIconRightRect( byval hButton as HWND, byref rc as RECT ) as boolean
+declare function PsButton_GetVisualRect( byval hButton as HWND, byref rc as RECT ) as boolean
 
 ' ----------------------------------------------------------------------------------------
 ' Appearance.  SetColors copies the whole struct. GetColors fills one out, so the
@@ -767,21 +767,21 @@ declare function CButton_GetVisualRect( byval hButton as HWND, byref rc as RECT 
 '                  changing it repaints but never re-lays-out, because the icon cell is
 '                  declared rather than measured. Unset falls back to the caption font.
 ' ----------------------------------------------------------------------------------------
-declare sub      CButton_GetColors( byval hButton as HWND, byval pColors as CBUTTON_COLORS ptr )
-declare sub      CButton_SetColors( byval hButton as HWND, byval pColors as CBUTTON_COLORS ptr )
-declare function CButton_GetFont( byval hButton as HWND ) as HFONT
-declare sub      CButton_SetFont( byval hButton as HWND, byval hTextFont as HFONT )
-declare function CButton_GetGlyphFont( byval hButton as HWND ) as HFONT
-declare sub      CButton_SetGlyphFont( byval hButton as HWND, byval hGlyphFont as HFONT )
+declare sub      PsButton_GetColors( byval hButton as HWND, byval pColors as PSBUTTON_COLORS ptr )
+declare sub      PsButton_SetColors( byval hButton as HWND, byval pColors as PSBUTTON_COLORS ptr )
+declare function PsButton_GetFont( byval hButton as HWND ) as HFONT
+declare sub      PsButton_SetFont( byval hButton as HWND, byval hTextFont as HFONT )
+declare function PsButton_GetGlyphFont( byval hButton as HWND ) as HFONT
+declare sub      PsButton_SetGlyphFont( byval hButton as HWND, byval hGlyphFont as HFONT )
 
 ' ----------------------------------------------------------------------------------------
 ' Tooltips.  The control's own text wins; the callback is consulted only when it is empty; with
 ' neither, no tip is shown -- there is no caption fallback (see BTN_TooltipCallbackFunc).
 ' ----------------------------------------------------------------------------------------
-declare function CButton_GetTooltipText( byval hButton as HWND ) as DWSTRING
-declare sub      CButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
-declare function CButton_GetTooltipHandle( byval hButton as HWND ) as HWND
-declare sub      CButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
+declare function PsButton_GetTooltipText( byval hButton as HWND ) as DWSTRING
+declare sub      PsButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
+declare function PsButton_GetTooltipHandle( byval hButton as HWND ) as HWND
+declare sub      PsButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
 
 ' ----------------------------------------------------------------------------------------
 ' Callbacks.  See the type declarations above for each signature and contract.
@@ -790,12 +790,12 @@ declare sub      CButton_SetHoverTime( byval hButton as HWND, byval milliseconds
 '                     default handling (IGNORED for WM_LBUTTONUP and the two focus messages).
 '   TooltipCallback - supply tooltip text on demand when the control has none of its own.
 '   ClickCallback   - the button was clicked (matched press+release, or Space/Enter, or the
-'                     programmatic CButton_Click).
+'                     programmatic PsButton_Click).
 ' ----------------------------------------------------------------------------------------
-declare sub      CButton_SetPaintCallback( byval hButton as HWND, byval usersub as BTN_PaintCallbackSub )
-declare sub      CButton_SetMessageCallback( byval hButton as HWND, byval userfunc as BTN_MessageCallbackFunc )
-declare sub      CButton_SetTooltipCallback( byval hButton as HWND, byval userfunc as BTN_TooltipCallbackFunc )
-declare sub      CButton_SetClickCallback( byval hButton as HWND, byval usersub as BTN_ClickCallbackSub )
+declare sub      PsButton_SetPaintCallback( byval hButton as HWND, byval usersub as BTN_PaintCallbackSub )
+declare sub      PsButton_SetMessageCallback( byval hButton as HWND, byval userfunc as BTN_MessageCallbackFunc )
+declare sub      PsButton_SetTooltipCallback( byval hButton as HWND, byval userfunc as BTN_TooltipCallbackFunc )
+declare sub      PsButton_SetClickCallback( byval hButton as HWND, byval usersub as BTN_ClickCallbackSub )
 
 ' ----------------------------------------------------------------------------------------
 ' Plumbing.
@@ -804,10 +804,10 @@ declare sub      CButton_SetClickCallback( byval hButton as HWND, byval usersub 
 '                 many distinct colours land inside one of its rects (capped at 64). Nothing in
 '                 the control calls it; it exists to make one specific defect measurable.
 '
-'                 THE DEFECT: CBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
+'                 THE DEFECT: PsBufferPaint.PaintBorderRect FILLS before it strokes, so a paint
 '                 callback that reaches for it to draw a frame or a focus ring floods everything
 '                 beneath and the control renders as one solid block. That has shipped three
-'                 times in this family (CToggle, CComboBox, CNumericUpDown), every time from a
+'                 times in this family (PsToggle, PsComboBox, PsNumericUpDown), every time from a
 '                 copied callback, and it survives a glance because the flood colour is a real
 '                 colour from the control. A wiped part is literally ONE tone, so
 '                 "count > 1" is an unambiguous assertion where a screenshot is a judgement.
@@ -823,7 +823,7 @@ declare sub      CButton_SetClickCallback( byval hButton as HWND, byval usersub 
 '                 (Learnings.md). Returns 0 if the control has no geometry yet.
 '
 '   RunSelfTest - geometry, colour-resolution and window-text assertions, gated on the
-'                 CBUTTON_SELFTEST env var. Call it from the host before the message loop.
+'                 PSBUTTON_SELFTEST env var. Call it from the host before the message loop.
 ' ----------------------------------------------------------------------------------------
-declare function CButton_CountRenderedTones( byval hButton as HWND, byval nPart as long ) as long
-declare sub      CButton_RunSelfTest( byval hWndParent as HWND )
+declare function PsButton_CountRenderedTones( byval hButton as HWND, byval nPart as long ) as long
+declare sub      PsButton_RunSelfTest( byval hWndParent as HWND )
