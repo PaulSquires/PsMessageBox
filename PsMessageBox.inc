@@ -1,21 +1,21 @@
 ''
-''  CMessageBox.inc  --  owner-drawn modal message box
+''  PsMessageBox.inc  --  owner-drawn modal message box
 ''
 
-#include once "CMessageBox.bi"
+#include once "PsMessageBox.bi"
 
 
 ' Forward declarations. The button plumbing is referenced by AddButton, which is defined well
 ' above the modal machinery that owns it.
-declare sub      CMessageBox_OnButtonClick( byval hButton as HWND, byval id as long )
-declare sub      CMessageBox_PositionButtons( byval pBox as CMESSAGEBOX ptr )
-declare sub      CMessageBox_Dismiss( byval pBox as CMESSAGEBOX ptr, byval nResult as long )
+declare sub      PsMessageBox_OnButtonClick( byval hButton as HWND, byval id as long )
+declare sub      PsMessageBox_PositionButtons( byval pBox as PSMESSAGEBOX ptr )
+declare sub      PsMessageBox_Dismiss( byval pBox as PSMESSAGEBOX ptr, byval nResult as long )
 
 
-function GetMessageBoxPointer( byval hMsgBox as HWND ) as CMESSAGEBOX ptr
+function GetMessageBoxPointer( byval hMsgBox as HWND ) as PSMESSAGEBOX ptr
     dim pWindow as CWindow ptr = AfxCWindowPtr(hMsgBox)
     if pWindow = 0 then return 0
-    return cast( CMESSAGEBOX ptr, pWindow->UserData(0) )
+    return cast( PSMESSAGEBOX ptr, pWindow->UserData(0) )
 end function
 
 
@@ -27,8 +27,8 @@ end function
 ' releases it); WM_CLOSE and WM_DESTROY are the other two, because a modal box that cannot be
 ' dismissed is a hang, not a refused action.
 ' ========================================================================================
-private function CMessageBox_CallMessage( _
-            byval pBox   as CMESSAGEBOX ptr, _
+private function PsMessageBox_CallMessage( _
+            byval pBox   as PSMESSAGEBOX ptr, _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
@@ -49,29 +49,29 @@ end function
 
 ' ========================================================================================
 ' Resolve the icon actually drawn: the host's override if it set one, else whatever the kind
-' maps to. Kept out of CMessageBox_ResolveGlyph / CMessageBox_ResolveIconColor so those stay
+' maps to. Kept out of PsMessageBox_ResolveGlyph / PsMessageBox_ResolveIconColor so those stay
 ' pure and their mapping stays assertable on its own.
 ' ========================================================================================
-private function CMessageBox_EffectiveGlyph( byval pBox as CMESSAGEBOX ptr ) as DWSTRING
+private function PsMessageBox_EffectiveGlyph( byval pBox as PSMESSAGEBOX ptr ) as DWSTRING
     if pBox = 0 then return ""
     if pBox->bGlyphOverride then
         dim as DWSTRING wszOut = pBox->wszGlyph
         return wszOut
     end if
-    return CMessageBox_ResolveGlyph( pBox->nIconKind )
+    return PsMessageBox_ResolveGlyph( pBox->nIconKind )
 end function
 
-private function CMessageBox_EffectiveIconColor( byval pBox as CMESSAGEBOX ptr ) as COLORREF
+private function PsMessageBox_EffectiveIconColor( byval pBox as PSMESSAGEBOX ptr ) as COLORREF
     if pBox = 0 then return 0
     if pBox->bIconOverride then return pBox->clrIconOverride
-    return CMessageBox_ResolveIconColor( pBox->nIconKind, @pBox->colors )
+    return PsMessageBox_ResolveIconColor( pBox->nIconKind, @pBox->colors )
 end function
 
 
 ' ========================================================================================
 ' Draw the box: caption band, close X, footer band and its divider, icon, message, border.
 '
-' Nothing in here touches a GDI object or a device context -- CBufferPaint owns rendering and
+' Nothing in here touches a GDI object or a device context -- PsBufferPaint owns rendering and
 ' this control owns geometry and state, which is the family contract.
 '
 ' THE BUTTONS ARE NOT DRAWN HERE. They are real child windows with their own WM_PAINT.
@@ -83,16 +83,16 @@ end function
 '
 ' THE BORDER IS DRAWN LAST, over everything, so a body or footer fill can never overpaint it.
 ' ========================================================================================
-private sub CMessageBox_RenderDefault( _
-            byval pBox as CMESSAGEBOX ptr, _
-            byval b    as CBufferPaint ptr, _
+private sub PsMessageBox_RenderDefault( _
+            byval pBox as PSMESSAGEBOX ptr, _
+            byval b    as PsBufferPaint ptr, _
             byval p    as MBX_PAINTINFO ptr _
             )
 
     if (pBox = 0) orelse (b = 0) orelse (p = 0) then exit sub
 
     ' The fonts. Paint with the SAME font the measuring pass used -- the caller's if set, else
-    ' the stock GUI font. CBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
+    ' the stock GUI font. PsBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
     ' silently paint in the DC's font while the wrap was measured in another, and the message
     ' would clip for no visible reason.
     dim as HFONT hTextUse = pBox->hTextFont
@@ -103,7 +103,7 @@ private sub CMessageBox_RenderDefault( _
     if hCapUse = 0 then hCapUse = hTextUse
     dim as HFONT hGlyphUse = pBox->hGlyphFont
     if hGlyphUse = 0 then hGlyphUse = hTextUse
-    ' The X gets its OWN font, falling back to the icon's. See CMESSAGEBOX.hCloseFont for why
+    ' The X gets its OWN font, falling back to the icon's. See PSMESSAGEBOX.hCloseFont for why
     ' one glyph font cannot serve a 32px icon and a 10px caption button.
     dim as HFONT hCloseUse = pBox->hCloseFont
     if hCloseUse = 0 then hCloseUse = hGlyphUse
@@ -118,7 +118,7 @@ private sub CMessageBox_RenderDefault( _
     ' ---- the close button ------------------------------------------------------------------
     ' Three moods and no disabled one: the X on a modal box is always live. Its idle background
     ' defaults EQUAL to the caption's, so it is invisible until the cursor reaches it -- the
-    ' same borderless-by-default trick CButton and CComboBox use.
+    ' same borderless-by-default trick PsButton and PsComboBox use.
     dim as COLORREF clrCloseBk = pBox->colors.CloseBackColor
     dim as COLORREF clrCloseFg = pBox->colors.CloseForeColor
     if p->isClosePressed then
@@ -135,7 +135,7 @@ private sub CMessageBox_RenderDefault( _
         b->PaintRect( @rcX )
         b->SetFont( hCloseUse )
         b->SetColors( clrCloseFg, clrCloseBk )
-        b->PaintText( wchr( CMESSAGEBOX_GLYPH_CLOSE ), @rcX, DT_CENTER )
+        b->PaintText( wchr( PSMESSAGEBOX_GLYPH_CLOSE ), @rcX, DT_CENTER )
     end if
 
     ' ---- the title -------------------------------------------------------------------------
@@ -166,7 +166,7 @@ private sub CMessageBox_RenderDefault( _
     ' ---- the icon --------------------------------------------------------------------------
     ' The cell is a LAYOUT rect, not a measurement of the glyph: the control never measures the
     ' icon font, so a glyph too large for the cell clips rather than resizing the box
-    ' (CIconPanel's declared-cell rule).
+    ' (PsIconPanel's declared-cell rule).
     if (IsRectEmpty( @p->rcIcon ) = 0) andalso (len( p->wszGlyph ) > 0) then
         dim as RECT rcI = p->rcIcon
         b->SetFont( hGlyphUse )
@@ -190,7 +190,7 @@ private sub CMessageBox_RenderDefault( _
 
     ' ---- the border ------------------------------------------------------------------------
     ' Outline, never filled, and LAST so nothing can paint over it. PaintRoundOutline with a
-    ' curvature of 0 is a plain rectangle; CBufferPaint owns the deflate-by-half-pen correction,
+    ' curvature of 0 is a plain rectangle; PsBufferPaint owns the deflate-by-half-pen correction,
     ' so the stroke lands inside the client rather than half off the edge.
     if pBox->nBorderThick > 0 then
         dim as RECT rcB = p->rcClient
@@ -204,12 +204,12 @@ end sub
 ' Fill a PAINTINFO from the box's current state and geometry. One place, so the WM_PAINT path
 ' and the offscreen tone probe cannot describe the box differently -- a probe that hand-built
 ' this struct and left one field zeroed silently skipped the thing it was measuring the first
-' time this pattern was written for CButton (Learnings.md).
+' time this pattern was written for PsButton (Learnings.md).
 ' ========================================================================================
-private sub CMessageBox_FillPaintInfo( _
-            byval pBox as CMESSAGEBOX ptr, _
+private sub PsMessageBox_FillPaintInfo( _
+            byval pBox as PSMESSAGEBOX ptr, _
             byval hwnd as HWND, _
-            byval b    as CBufferPaint ptr, _
+            byval b    as PsBufferPaint ptr, _
             byval p    as MBX_PAINTINFO ptr _
             )
 
@@ -230,22 +230,22 @@ private sub CMessageBox_FillPaintInfo( _
     p->isActive       = (GetActiveWindow() = hwnd)
     p->wszCaption     = pBox->wszCaption
     p->wszText        = pBox->wszText
-    p->wszGlyph       = CMessageBox_EffectiveGlyph( pBox )
-    p->clrIcon        = CMessageBox_EffectiveIconColor( pBox )
+    p->wszGlyph       = PsMessageBox_EffectiveGlyph( pBox )
+    p->clrIcon        = PsMessageBox_EffectiveIconColor( pBox )
 end sub
 
 
 ' ========================================================================================
 ' Process WM_PAINT.
 ' ========================================================================================
-private function CMessageBox_OnPaint( byval hwnd as HWND ) as LRESULT
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hwnd)
+private function PsMessageBox_OnPaint( byval hwnd as HWND ) as LRESULT
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hwnd)
     if pBox = null then return 0
 
     ' Consume any pending layout before painting -- this is what makes layout lazy.
     if pBox->bLayoutDirty then pBox->LayoutBox()
 
-    dim as CBufferPaint b
+    dim as PsBufferPaint b
     b.BeginDoubleBuffer(hwnd)
 
     ' The body colour, not a fixed one, so a paint callback that draws only a foreground still
@@ -254,12 +254,12 @@ private function CMessageBox_OnPaint( byval hwnd as HWND ) as LRESULT
     b.PaintClientRect()
 
     dim p as MBX_PAINTINFO
-    CMessageBox_FillPaintInfo( pBox, hwnd, @b, @p )
+    PsMessageBox_FillPaintInfo( pBox, hwnd, @b, @p )
 
     if pBox->PaintCallback then
         pBox->PaintCallback( @p )
     else
-        CMessageBox_RenderDefault( pBox, @b, @p )
+        PsMessageBox_RenderDefault( pBox, @b, @p )
     end if
 
     b.EndDoubleBuffer()
@@ -271,7 +271,7 @@ end function
 ' Clear the close button's hover state and stop the hover poll timer. Repaints only if the
 ' state actually changes, so this is cheap to call repeatedly.
 ' ========================================================================================
-private sub CMessageBox_ClearCloseHot( byval pBox as CMESSAGEBOX ptr, byval hwnd as HWND )
+private sub PsMessageBox_ClearCloseHot( byval pBox as PSMESSAGEBOX ptr, byval hwnd as HWND )
     if pBox = 0 then exit sub
     if pBox->hotTimerOn then
         KillTimer( hwnd, IDT_CMESSAGEBOX_HOTTRACK )
@@ -294,7 +294,7 @@ end sub
 ' It does NOT destroy the window: DoModal owns that, and destroying here would free the state
 ' out from under the loop that is about to read nResult.
 ' ========================================================================================
-sub CMessageBox_Dismiss( byval pBox as CMESSAGEBOX ptr, byval nResult as long )
+sub PsMessageBox_Dismiss( byval pBox as PSMESSAGEBOX ptr, byval nResult as long )
     if pBox = 0 then exit sub
     pBox->nResult  = nResult
     pBox->bRunning = false
@@ -309,12 +309,12 @@ end sub
 ' child window of the box, so the relationship is already recorded by the window manager and a
 ' second copy of it could only ever go stale.
 ' ========================================================================================
-sub CMessageBox_OnButtonClick( byval hButton as HWND, byval id as long )
+sub PsMessageBox_OnButtonClick( byval hButton as HWND, byval id as long )
     dim as HWND hBox = GetParent( hButton )
     if hBox = 0 then exit sub
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer( hBox )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer( hBox )
     if pBox = 0 then exit sub
-    CMessageBox_Dismiss( pBox, id )
+    PsMessageBox_Dismiss( pBox, id )
 end sub
 
 
@@ -325,7 +325,7 @@ end sub
 ' from inside a paint invites a recursive invalidation storm; this runs from WM_SIZE and from
 ' DoModal, where a SetWindowPos is exactly what is expected.
 ' ========================================================================================
-sub CMessageBox_PositionButtons( byval pBox as CMESSAGEBOX ptr )
+sub PsMessageBox_PositionButtons( byval pBox as PSMESSAGEBOX ptr )
     if pBox = 0 then exit sub
     if pBox->bLayoutDirty then pBox->LayoutBox()
     if pBox->bLayoutDirty then exit sub          ' still no client area; nothing to place onto
@@ -342,11 +342,11 @@ end sub
 
 
 ' ========================================================================================
-' CMessageBox Window procedure
+' PsMessageBox Window procedure
 '
 ' MOUSE CAPTURE IS TAKEN, but only for the close button. The family's test is "take capture only
 ' if something consumes the guaranteed WM_LBUTTONDOWN -> WM_LBUTTONUP pairing", and the X has
-' exactly CButton's press/cancel gesture: press it, slide off, release, nothing happens. So the
+' exactly PsButton's press/cancel gesture: press it, slide off, release, nothing happens. So the
 ' full price is paid -- snapshot the press before releasing, a WM_CAPTURECHANGED handler that
 ' cancels it, a release in WM_DESTROY, and a callback result that is ignored for the up-message.
 '
@@ -358,19 +358,19 @@ end sub
 ' THE BOX ITSELF IS NOT FOCUSABLE. It has no WS_TABSTOP and never calls SetFocus on itself: the
 ' tabstops are the child buttons, which is why this window carries WS_EX_CONTROLPARENT.
 ' ========================================================================================
-function CMessageBox_WndProc( _
+function PsMessageBox_WndProc( _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
             byval lParam as LPARAM _
             ) as LRESULT
 
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer( hwnd )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer( hwnd )
 
     select case uMsg
 
     case WM_PAINT
-        return CMessageBox_OnPaint( hwnd )
+        return PsMessageBox_OnPaint( hwnd )
 
     case WM_ERASEBKGND
         ' Never erase: WM_PAINT fills the whole client through the double buffer, so a
@@ -383,7 +383,7 @@ function CMessageBox_WndProc( _
             ' buttons have to be moved and that cannot happen from inside WM_PAINT.
             pBox->bLayoutDirty = true
             pBox->LayoutBox()
-            CMessageBox_PositionButtons( pBox )
+            PsMessageBox_PositionButtons( pBox )
             InvalidateRect( hwnd, NULL, TRUE )
         end if
         return 0
@@ -419,7 +419,7 @@ function CMessageBox_WndProc( _
             ' come back, and WM_MOUSEMOVE is already maintaining isCloseHot for exactly that.
             if pBox->isClosePressed = false then
                 if isMouseOverRECT( hwnd, pBox->rcClose ) = false then
-                    CMessageBox_ClearCloseHot( pBox, hwnd )
+                    PsMessageBox_ClearCloseHot( pBox, hwnd )
                 end if
             end if
             return 0
@@ -441,7 +441,7 @@ function CMessageBox_WndProc( _
             ' Safety net: WM_MOUSELEAVE is not guaranteed to arrive when the mouse exits
             ' quickly, which would strand the X painted red.
             if pBox->hotTimerOn = false then
-                SetTimer( hwnd, IDT_CMESSAGEBOX_HOTTRACK, CMESSAGEBOX_HOTTRACK_MS, NULL )
+                SetTimer( hwnd, IDT_CMESSAGEBOX_HOTTRACK, PSMESSAGEBOX_HOTTRACK_MS, NULL )
                 pBox->hotTimerOn = true
             end if
         end if
@@ -454,12 +454,12 @@ function CMessageBox_WndProc( _
             InvalidateRect( hwnd, @pBox->rcClose, FALSE )
         end if
 
-        if CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
 
     case WM_MOUSELEAVE
         if pBox then
-            if pBox->isClosePressed = false then CMessageBox_ClearCloseHot( pBox, hwnd )
-            if CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
+            if pBox->isClosePressed = false then PsMessageBox_ClearCloseHot( pBox, hwnd )
+            if PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
         end if
 
     case WM_LBUTTONDOWN
@@ -468,7 +468,7 @@ function CMessageBox_WndProc( _
 
         ' Suppressing the press is allowed: no capture has been taken yet, so there is no
         ' bookkeeping to strand.
-        if CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam ) then return 0
 
         if isMouseOverRECT( hwnd, pBox->rcClose ) then
             SetCapture( hwnd )
@@ -495,7 +495,7 @@ function CMessageBox_WndProc( _
         InvalidateRect( hwnd, @pBox->rcClose, FALSE )
 
         ' The result is deliberately IGNORED here (see MBX_MessageCallbackFunc).
-        CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
+        PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
 
         ' Only a matched press+release still on the X closes the box. Press, slide off, release
         ' = nothing happened, which is the whole reason for capture.
@@ -519,14 +519,14 @@ function CMessageBox_WndProc( _
         ' which is an unrecoverable hang rather than a refused action. A host that does not want
         ' the box dismissable this way should not offer a cancel path.
         if pBox then
-            CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
-            CMessageBox_Dismiss( pBox, pBox->ResolveCancelID() )
+            PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
+            PsMessageBox_Dismiss( pBox, pBox->ResolveCancelID() )
         end if
         return 0
 
     case WM_DESTROY
         if pBox then
-            CMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
+            PsMessageBox_CallMessage( pBox, hwnd, uMsg, wParam, lParam )
             ' Don't let the hot-tracking timer outlive the window...
             if pBox->hotTimerOn then
                 KillTimer( hwnd, IDT_CMESSAGEBOX_HOTTRACK )
@@ -560,9 +560,9 @@ end function
 
 
 ' ========================================================================================
-' CMessageBox_Create
+' PsMessageBox_Create
 ' ========================================================================================
-function CMessageBox_Create( byval hWndParent as HWND ) as HWND
+function PsMessageBox_Create( byval hWndParent as HWND ) as HWND
 
     dim pWindow as CWindow ptr = New CWindow
 
@@ -570,7 +570,7 @@ function CMessageBox_Create( byval hWndParent as HWND ) as HWND
     ' this control, which is the only way the host's colours and font reach them.
     '
     ' THE EXTENDED STYLE IS PASSED EXPLICITLY, AND WS_EX_CONTROLPARENT IS CORRECT HERE -- the
-    ' exact OPPOSITE of the CButton fix. CWindow.Create defaults dwExStyle to
+    ' exact OPPOSITE of the PsButton fix. CWindow.Create defaults dwExStyle to
     ' WS_EX_CONTROLPARENT OR WS_EX_WINDOWEDGE; a LEAF control that inherits that silently
     ' declares itself a container and becomes unreachable by Tab. This window genuinely IS a
     ' container -- its tabstops are the child buttons -- so the dialog manager MUST descend into
@@ -581,7 +581,7 @@ function CMessageBox_Create( byval hWndParent as HWND ) as HWND
     ' a control?". See the per-sibling table in C:\dev\Learnings.md, and the self-test, which
     ' asserts this window HAS the flag and its buttons do NOT.
     dim as HWND hCtrl = _
-            pWindow->Create( hWndParent, "", @CMessageBox_WndProc, _
+            pWindow->Create( hWndParent, "", @PsMessageBox_WndProc, _
             0, 0, 0, 0, _
             WS_POPUP or WS_CLIPSIBLINGS or WS_CLIPCHILDREN, _
             WS_EX_CONTROLPARENT _
@@ -597,27 +597,27 @@ function CMessageBox_Create( byval hWndParent as HWND ) as HWND
     ' NOTE: CS_DBLCLKS is deliberately NOT included -- see the WndProc header.
     pWindow->ClassStyle = CS_DROPSHADOW
 
-    dim as CMESSAGEBOX ptr pBox = new CMESSAGEBOX
+    dim as PSMESSAGEBOX ptr pBox = new PSMESSAGEBOX
     pBox->hWin    = hCtrl
     pBox->hParent = hWndParent
 
     ' Only the Create-time defaults are DPI-scaled for us; every setter afterwards takes raw
     ' pixels and the caller scales (the family rule). The two THICKNESS values are not scaled at
     ' all, here or anywhere -- a hairline stays a hairline.
-    pBox->nCaptionHeight  = pWindow->ScaleY( CMESSAGEBOX_DEFAULT_CAPTIONHEIGHT )
-    pBox->nCaptionPadX    = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_CAPTIONPADX )
-    pBox->nCloseWidth     = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_CLOSEWIDTH )
-    pBox->nBodyPadX       = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_BODYPADX )
-    pBox->nBodyPadY       = pWindow->ScaleY( CMESSAGEBOX_DEFAULT_BODYPADY )
-    pBox->nFooterPadX     = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_FOOTERPADX )
-    pBox->nFooterPadY     = pWindow->ScaleY( CMESSAGEBOX_DEFAULT_FOOTERPADY )
-    pBox->nIconWidth      = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_ICONWIDTH )
-    pBox->nIconHeight     = pWindow->ScaleY( CMESSAGEBOX_DEFAULT_ICONHEIGHT )
-    pBox->nIconGap        = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_ICONGAP )
-    pBox->nButtonGap      = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_BUTTONGAP )
-    pBox->nButtonMinWidth = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_BUTTONMINWIDTH )
-    pBox->nMaxWidth       = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_MAXWIDTH )
-    pBox->nMinWidth       = pWindow->ScaleX( CMESSAGEBOX_DEFAULT_MINWIDTH )
+    pBox->nCaptionHeight  = pWindow->ScaleY( PSMESSAGEBOX_DEFAULT_CAPTIONHEIGHT )
+    pBox->nCaptionPadX    = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_CAPTIONPADX )
+    pBox->nCloseWidth     = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_CLOSEWIDTH )
+    pBox->nBodyPadX       = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_BODYPADX )
+    pBox->nBodyPadY       = pWindow->ScaleY( PSMESSAGEBOX_DEFAULT_BODYPADY )
+    pBox->nFooterPadX     = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_FOOTERPADX )
+    pBox->nFooterPadY     = pWindow->ScaleY( PSMESSAGEBOX_DEFAULT_FOOTERPADY )
+    pBox->nIconWidth      = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_ICONWIDTH )
+    pBox->nIconHeight     = pWindow->ScaleY( PSMESSAGEBOX_DEFAULT_ICONHEIGHT )
+    pBox->nIconGap        = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_ICONGAP )
+    pBox->nButtonGap      = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_BUTTONGAP )
+    pBox->nButtonMinWidth = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_BUTTONMINWIDTH )
+    pBox->nMaxWidth       = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_MAXWIDTH )
+    pBox->nMinWidth       = pWindow->ScaleX( PSMESSAGEBOX_DEFAULT_MINWIDTH )
 
     ' Store the new pointer into the user data area of the control window
     pWindow->UserData(0) = cast(LONG_PTR, pBox)
@@ -630,42 +630,42 @@ end function
 ' ========================================================================================
 ' Content.  All SILENT -- they change what is drawn, never what was answered.
 ' ========================================================================================
-function CMessageBox_GetCaption( byval hMsgBox as HWND ) as DWSTRING
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetCaption( byval hMsgBox as HWND ) as DWSTRING
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return ""
     dim as DWSTRING wszOut = pBox->wszCaption
     return wszOut
 end function
 
-sub CMessageBox_SetCaption( byval hMsgBox as HWND, byval Text as DWSTRING )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetCaption( byval hMsgBox as HWND, byval Text as DWSTRING )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->wszCaption = Text
     pBox->Refresh()
 end sub
 
-function CMessageBox_GetText( byval hMsgBox as HWND ) as DWSTRING
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetText( byval hMsgBox as HWND ) as DWSTRING
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return ""
     dim as DWSTRING wszOut = pBox->wszText
     return wszOut
 end function
 
-sub CMessageBox_SetText( byval hMsgBox as HWND, byval Text as DWSTRING )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetText( byval hMsgBox as HWND, byval Text as DWSTRING )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->wszText = Text
     pBox->Refresh()
 end sub
 
-function CMessageBox_GetIconKind( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetIconKind( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return MBX_ICON_NONE
     return pBox->nIconKind
 end function
 
-sub CMessageBox_SetIconKind( byval hMsgBox as HWND, byval nKind as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetIconKind( byval hMsgBox as HWND, byval nKind as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (nKind < MBX_ICON_NONE) orelse (nKind > MBX_ICON_QUESTION) then exit sub
     pBox->nIconKind = nKind
@@ -673,18 +673,18 @@ sub CMessageBox_SetIconKind( byval hMsgBox as HWND, byval nKind as long )
 end sub
 
 ' A glyph override TURNS THE ICON ON even when the kind is MBX_ICON_NONE (see
-' CMESSAGEBOX.HasIcon): setting a glyph is an unambiguous request for one. Passing "" clears the
+' PSMESSAGEBOX.HasIcon): setting a glyph is an unambiguous request for one. Passing "" clears the
 ' override and hands the decision back to the kind.
-sub CMessageBox_SetGlyph( byval hMsgBox as HWND, byval Glyph as DWSTRING )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetGlyph( byval hMsgBox as HWND, byval Glyph as DWSTRING )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->wszGlyph       = Glyph
     pBox->bGlyphOverride = (len( Glyph ) > 0)
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetIconColor( byval hMsgBox as HWND, byval clr as COLORREF )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetIconColor( byval hMsgBox as HWND, byval clr as COLORREF )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->clrIconOverride = clr
     pBox->bIconOverride   = true
@@ -692,8 +692,8 @@ sub CMessageBox_SetIconColor( byval hMsgBox as HWND, byval clr as COLORREF )
     if pBox->hWin then InvalidateRect( pBox->hWin, NULL, FALSE )
 end sub
 
-sub CMessageBox_SetBeep( byval hMsgBox as HWND, byval bBeep as boolean )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetBeep( byval hMsgBox as HWND, byval bBeep as boolean )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->bBeep = bBeep
 end sub
@@ -702,27 +702,27 @@ end sub
 ' ========================================================================================
 ' Buttons.
 ' ========================================================================================
-function CMessageBox_AddButton( byval hMsgBox as HWND, byval Text as DWSTRING, byval id as long ) as HWND
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_AddButton( byval hMsgBox as HWND, byval Text as DWSTRING, byval id as long ) as HWND
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
-    if pBox->nButtonCount >= CMESSAGEBOX_MAXBUTTONS then return 0
+    if pBox->nButtonCount >= PSMESSAGEBOX_MAXBUTTONS then return 0
 
     dim as long idx = pBox->nButtonCount
 
     ' The control id is positional and internal; the HOST's id goes on separately and is what
     ' DoModal returns. Keeping them apart is what stops a host id of 0 or 1 colliding with
     ' anything the dialog manager cares about.
-    dim as HWND hBtn = CButton_Create( hMsgBox, IDC_CMESSAGEBOX_BUTTON_BASE + idx )
+    dim as HWND hBtn = PsButton_Create( hMsgBox, IDC_CMESSAGEBOX_BUTTON_BASE + idx )
     if hBtn = 0 then return 0
 
-    CButton_SetText( hBtn, Text )
-    CButton_SetID( hBtn, id )
-    CButton_SetClickCallback( hBtn, @CMessageBox_OnButtonClick )
+    PsButton_SetText( hBtn, Text )
+    PsButton_SetID( hBtn, id )
+    PsButton_SetClickCallback( hBtn, @PsMessageBox_OnButtonClick )
     ' Push the box's current appearance into the new button, so Add-then-SetFont and
     ' SetFont-then-Add produce the same result (SetFont/SetButtonColors re-apply to all).
-    CButton_SetColors( hBtn, @pBox->btnColors )
-    if pBox->hTextFont  then CButton_SetFont( hBtn, pBox->hTextFont )
-    if pBox->hGlyphFont then CButton_SetGlyphFont( hBtn, pBox->hGlyphFont )
+    PsButton_SetColors( hBtn, @pBox->btnColors )
+    if pBox->hTextFont  then PsButton_SetFont( hBtn, pBox->hTextFont )
+    if pBox->hGlyphFont then PsButton_SetGlyphFont( hBtn, pBox->hGlyphFont )
 
     pBox->hButtons(idx) = hBtn
     pBox->nButtonCount += 1
@@ -733,112 +733,112 @@ end function
 
 ' Add a whole set AND set the default button and the cancel id to match. Additive: calling it on
 ' a box that already has buttons is a host error, not something this polices.
-sub CMessageBox_AddPreset( byval hMsgBox as HWND, byval nPreset as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_AddPreset( byval hMsgBox as HWND, byval nPreset as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
 
     select case nPreset
     case MBX_BTN_OKCANCEL
-        CMessageBox_AddButton( hMsgBox, "OK", IDOK )
-        CMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
-        CMessageBox_SetCancelID( hMsgBox, IDCANCEL )
+        PsMessageBox_AddButton( hMsgBox, "OK", IDOK )
+        PsMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_SetCancelID( hMsgBox, IDCANCEL )
 
     case MBX_BTN_YESNO
-        CMessageBox_AddButton( hMsgBox, "Yes", IDYES )
-        CMessageBox_AddButton( hMsgBox, "No", IDNO )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_AddButton( hMsgBox, "Yes", IDYES )
+        PsMessageBox_AddButton( hMsgBox, "No", IDNO )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
         ' No Cancel button, so Esc / the X answer NO -- the safe half of a yes/no question.
-        CMessageBox_SetCancelID( hMsgBox, IDNO )
+        PsMessageBox_SetCancelID( hMsgBox, IDNO )
 
     case MBX_BTN_YESNOCANCEL
-        CMessageBox_AddButton( hMsgBox, "Yes", IDYES )
-        CMessageBox_AddButton( hMsgBox, "No", IDNO )
-        CMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
-        CMessageBox_SetCancelID( hMsgBox, IDCANCEL )
+        PsMessageBox_AddButton( hMsgBox, "Yes", IDYES )
+        PsMessageBox_AddButton( hMsgBox, "No", IDNO )
+        PsMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_SetCancelID( hMsgBox, IDCANCEL )
 
     case MBX_BTN_RETRYCANCEL
-        CMessageBox_AddButton( hMsgBox, "Retry", IDRETRY )
-        CMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
-        CMessageBox_SetCancelID( hMsgBox, IDCANCEL )
+        PsMessageBox_AddButton( hMsgBox, "Retry", IDRETRY )
+        PsMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_SetCancelID( hMsgBox, IDCANCEL )
 
     case MBX_BTN_SAVE_DONTSAVE_CANCEL
         ' The reference screenshot. Note the ids: there is no IDSAVE in Win32, so a save
         ' question is a yes/no/cancel question wearing better captions.
-        CMessageBox_AddButton( hMsgBox, "Save", IDYES )
-        CMessageBox_AddButton( hMsgBox, "Don't Save", IDNO )
-        CMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
-        CMessageBox_SetCancelID( hMsgBox, IDCANCEL )
+        PsMessageBox_AddButton( hMsgBox, "Save", IDYES )
+        PsMessageBox_AddButton( hMsgBox, "Don't Save", IDNO )
+        PsMessageBox_AddButton( hMsgBox, "Cancel", IDCANCEL )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_SetCancelID( hMsgBox, IDCANCEL )
 
     case else       ' MBX_BTN_OK
-        CMessageBox_AddButton( hMsgBox, "OK", IDOK )
-        CMessageBox_SetDefaultButton( hMsgBox, 0 )
+        PsMessageBox_AddButton( hMsgBox, "OK", IDOK )
+        PsMessageBox_SetDefaultButton( hMsgBox, 0 )
         ' The only button IS the cancel path: with nothing else to answer, Esc must not be a
         ' silent no-op.
-        CMessageBox_SetCancelID( hMsgBox, IDOK )
+        PsMessageBox_SetCancelID( hMsgBox, IDOK )
     end select
 end sub
 
-function CMessageBox_GetButtonCount( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetButtonCount( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->nButtonCount
 end function
 
-function CMessageBox_GetButtonHandle( byval hMsgBox as HWND, byval idx as long ) as HWND
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetButtonHandle( byval hMsgBox as HWND, byval idx as long ) as HWND
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     if (idx < 0) orelse (idx >= pBox->nButtonCount) then return 0
     return pBox->hButtons(idx)
 end function
 
-function CMessageBox_GetDefaultButton( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetDefaultButton( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return -1
     return pBox->nDefaultIndex
 end function
 
 ' Paints the accent border, claims Enter box-wide, AND takes the initial focus -- unless
-' SetFocusButton is called AFTER this. See CMESSAGEBOX.ResolveFocusIndex for the precedence.
+' SetFocusButton is called AFTER this. See PSMESSAGEBOX.ResolveFocusIndex for the precedence.
 '
-' Clearing the old default matters: CButton_SetDefault is appearance only and does not police
+' Clearing the old default matters: PsButton_SetDefault is appearance only and does not police
 ' uniqueness, so without this a host that changed its mind would end up with two accent borders.
-sub CMessageBox_SetDefaultButton( byval hMsgBox as HWND, byval idx as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetDefaultButton( byval hMsgBox as HWND, byval idx as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (idx < -1) orelse (idx >= pBox->nButtonCount) then exit sub
 
     for i as long = 0 to pBox->nButtonCount - 1
-        CButton_SetDefault( pBox->hButtons(i), (i = idx) )
+        PsButton_SetDefault( pBox->hButtons(i), (i = idx) )
     next
     pBox->nDefaultIndex = idx
 end sub
 
-function CMessageBox_GetFocusButton( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetFocusButton( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return -1
     return pBox->ResolveFocusIndex()
 end function
 
-sub CMessageBox_SetFocusButton( byval hMsgBox as HWND, byval idx as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetFocusButton( byval hMsgBox as HWND, byval idx as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (idx < 0) orelse (idx >= pBox->nButtonCount) then exit sub
     pBox->nFocusIndex    = idx
     pBox->bFocusExplicit = true
 end sub
 
-function CMessageBox_GetCancelID( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetCancelID( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->ResolveCancelID()
 end function
 
-sub CMessageBox_SetCancelID( byval hMsgBox as HWND, byval id as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetCancelID( byval hMsgBox as HWND, byval id as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->nCancelID    = id
     pBox->bCancelIDSet = true
@@ -848,32 +848,32 @@ end sub
 ' ========================================================================================
 ' Layout.  ALL setters take RAW PIXELS -- the caller DPI-scales.
 ' ========================================================================================
-sub CMessageBox_SetMaxWidth( byval hMsgBox as HWND, byval nMaxWidth as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetMaxWidth( byval hMsgBox as HWND, byval nMaxWidth as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nMaxWidth < 1 then exit sub
     pBox->nMaxWidth = nMaxWidth
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nMinWidth < 0 then exit sub
     pBox->nMinWidth = nMinWidth
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetCaptionHeight( byval hMsgBox as HWND, byval nHeight as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetCaptionHeight( byval hMsgBox as HWND, byval nHeight as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nHeight < 0 then exit sub
     pBox->nCaptionHeight = nHeight
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetBodyPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetBodyPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (nX < 0) orelse (nY < 0) then exit sub
     pBox->nBodyPadX = nX
@@ -881,8 +881,8 @@ sub CMessageBox_SetBodyPadding( byval hMsgBox as HWND, byval nX as long, byval n
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetFooterPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetFooterPadding( byval hMsgBox as HWND, byval nX as long, byval nY as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (nX < 0) orelse (nY < 0) then exit sub
     pBox->nFooterPadX = nX
@@ -890,8 +890,8 @@ sub CMessageBox_SetFooterPadding( byval hMsgBox as HWND, byval nX as long, byval
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetIconSize( byval hMsgBox as HWND, byval nIconWidth as long, byval nIconHeight as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetIconSize( byval hMsgBox as HWND, byval nIconWidth as long, byval nIconHeight as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if (nIconWidth < 0) orelse (nIconHeight < 0) then exit sub
     pBox->nIconWidth  = nIconWidth
@@ -899,32 +899,32 @@ sub CMessageBox_SetIconSize( byval hMsgBox as HWND, byval nIconWidth as long, by
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetIconGap( byval hMsgBox as HWND, byval nGap as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetIconGap( byval hMsgBox as HWND, byval nGap as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nGap < 0 then exit sub
     pBox->nIconGap = nGap
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetButtonGap( byval hMsgBox as HWND, byval nGap as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetButtonGap( byval hMsgBox as HWND, byval nGap as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nGap < 0 then exit sub
     pBox->nButtonGap = nGap
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetButtonMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetButtonMinWidth( byval hMsgBox as HWND, byval nMinWidth as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nMinWidth < 0 then exit sub
     pBox->nButtonMinWidth = nMinWidth
     pBox->Refresh()
 end sub
 
-sub CMessageBox_SetBorderThickness( byval hMsgBox as HWND, byval nThickness as long )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetBorderThickness( byval hMsgBox as HWND, byval nThickness as long )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if nThickness < 0 then exit sub
     pBox->nBorderThick = nThickness
@@ -933,10 +933,10 @@ sub CMessageBox_SetBorderThickness( byval hMsgBox as HWND, byval nThickness as l
     if pBox->hWin then InvalidateRect( pBox->hWin, NULL, FALSE )
 end sub
 
-sub CMessageBox_GetIdealSize( byval hMsgBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
+sub PsMessageBox_GetIdealSize( byval hMsgBox as HWND, byref nBoxWidth as long, byref nBoxHeight as long )
     nBoxWidth  = 0
     nBoxHeight = 0
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     if pBox->bLayoutDirty then pBox->LayoutBox()
     nBoxWidth  = pBox->nIdealW
@@ -947,14 +947,14 @@ end sub
 ' The rect queries. Each forces a pending layout, so results are always current. FALSE means the
 ' box has no geometry yet (created but never sized); an absent part answers TRUE with an EMPTY
 ' rect, because empty is the honest answer.
-private function CMessageBox_QueryRect( _
+private function PsMessageBox_QueryRect( _
             byval hMsgBox as HWND, _
             byval nPart   as long, _
             byref rc      as RECT _
             ) as boolean
 
     SetRectEmpty( @rc )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return false
     if pBox->bLayoutDirty then pBox->LayoutBox()
     if pBox->bLayoutDirty then return false      ' no client area yet
@@ -970,33 +970,33 @@ private function CMessageBox_QueryRect( _
     return true
 end function
 
-function CMessageBox_GetCaptionRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_CAPTION, rc )
+function PsMessageBox_GetCaptionRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_CAPTION, rc )
 end function
 
-function CMessageBox_GetCloseRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_CLOSE, rc )
+function PsMessageBox_GetCloseRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_CLOSE, rc )
 end function
 
-function CMessageBox_GetBodyRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_BODY, rc )
+function PsMessageBox_GetBodyRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_BODY, rc )
 end function
 
-function CMessageBox_GetIconRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_ICON, rc )
+function PsMessageBox_GetIconRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_ICON, rc )
 end function
 
-function CMessageBox_GetTextRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_TEXT, rc )
+function PsMessageBox_GetTextRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_TEXT, rc )
 end function
 
-function CMessageBox_GetFooterRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
-    return CMessageBox_QueryRect( hMsgBox, MBX_PART_FOOTER, rc )
+function PsMessageBox_GetFooterRect( byval hMsgBox as HWND, byref rc as RECT ) as boolean
+    return PsMessageBox_QueryRect( hMsgBox, MBX_PART_FOOTER, rc )
 end function
 
-function CMessageBox_GetButtonRect( byval hMsgBox as HWND, byval idx as long, byref rc as RECT ) as boolean
+function PsMessageBox_GetButtonRect( byval hMsgBox as HWND, byval idx as long, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return false
     if (idx < 0) orelse (idx >= pBox->nButtonCount) then return false
     if pBox->bLayoutDirty then pBox->LayoutBox()
@@ -1009,14 +1009,14 @@ end function
 ' ========================================================================================
 ' Appearance.
 ' ========================================================================================
-sub CMessageBox_GetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_GetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if (pBox = 0) orelse (pColors = 0) then exit sub
     *pColors = pBox->colors
 end sub
 
-sub CMessageBox_SetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetColors( byval hMsgBox as HWND, byval pColors as MBX_COLORS ptr )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if (pBox = 0) orelse (pColors = 0) then exit sub
     pBox->colors = *pColors
     if pBox->hWin then InvalidateRect( pBox->hWin, NULL, FALSE )
@@ -1024,78 +1024,78 @@ end sub
 
 ' Pushed into every button that exists NOW and stored for every button added LATER, so the order
 ' of AddButton and SetButtonColors does not matter.
-sub CMessageBox_SetButtonColors( byval hMsgBox as HWND, byval pColors as CBUTTON_COLORS ptr )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetButtonColors( byval hMsgBox as HWND, byval pColors as PSBUTTON_COLORS ptr )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if (pBox = 0) orelse (pColors = 0) then exit sub
     pBox->btnColors = *pColors
     for i as long = 0 to pBox->nButtonCount - 1
-        CButton_SetColors( pBox->hButtons(i), pColors )
+        PsButton_SetColors( pBox->hButtons(i), pColors )
     next
 end sub
 
-function CMessageBox_GetFont( byval hMsgBox as HWND ) as HFONT
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetFont( byval hMsgBox as HWND ) as HFONT
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->hTextFont
 end function
 
 ' The MESSAGE font and the MEASURING font. Changing it re-wraps, which changes the box's height.
 ' Also pushed into the buttons, whose own ideal widths then change too.
-sub CMessageBox_SetFont( byval hMsgBox as HWND, byval hTextFont as HFONT )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetFont( byval hMsgBox as HWND, byval hTextFont as HFONT )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->hTextFont = hTextFont
     for i as long = 0 to pBox->nButtonCount - 1
-        CButton_SetFont( pBox->hButtons(i), hTextFont )
+        PsButton_SetFont( pBox->hButtons(i), hTextFont )
     next
     pBox->Refresh()
 end sub
 
-function CMessageBox_GetCaptionFont( byval hMsgBox as HWND ) as HFONT
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetCaptionFont( byval hMsgBox as HWND ) as HFONT
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->hCaptionFont
 end function
 
-sub CMessageBox_SetCaptionFont( byval hMsgBox as HWND, byval hCaptionFont as HFONT )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetCaptionFont( byval hMsgBox as HWND, byval hCaptionFont as HFONT )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->hCaptionFont = hCaptionFont
     ' The title contributes a WIDTH FLOOR, so this really can change the box's size.
     pBox->Refresh()
 end sub
 
-function CMessageBox_GetGlyphFont( byval hMsgBox as HWND ) as HFONT
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetGlyphFont( byval hMsgBox as HWND ) as HFONT
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->hGlyphFont
 end function
 
 ' The ICON font, used for both the message icon and the close X. A paint-time input only
-' (CIconPanel's rule): the icon cell is DECLARED by SetIconSize and never measured, so changing
+' (PsIconPanel's rule): the icon cell is DECLARED by SetIconSize and never measured, so changing
 ' this repaints without re-laying-out. It is still pushed into the buttons, where it is their
 ' glyph font and likewise does not re-measure them.
-sub CMessageBox_SetGlyphFont( byval hMsgBox as HWND, byval hGlyphFont as HFONT )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetGlyphFont( byval hMsgBox as HWND, byval hGlyphFont as HFONT )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->hGlyphFont = hGlyphFont
     for i as long = 0 to pBox->nButtonCount - 1
-        CButton_SetGlyphFont( pBox->hButtons(i), hGlyphFont )
+        PsButton_SetGlyphFont( pBox->hButtons(i), hGlyphFont )
     next
     if pBox->hWin then InvalidateRect( pBox->hWin, NULL, FALSE )
 end sub
 
 
-function CMessageBox_GetCloseGlyphFont( byval hMsgBox as HWND ) as HFONT
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_GetCloseGlyphFont( byval hMsgBox as HWND ) as HFONT
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     return pBox->hCloseFont
 end function
 
 ' The close X's font. Not pushed into the buttons -- it is caption chrome, not content -- and a
 ' paint-time input only, so this repaints without re-laying-out.
-sub CMessageBox_SetCloseGlyphFont( byval hMsgBox as HWND, byval hCloseFont as HFONT )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetCloseGlyphFont( byval hMsgBox as HWND, byval hCloseFont as HFONT )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->hCloseFont = hCloseFont
     if pBox->hWin then InvalidateRect( pBox->hWin, @pBox->rcClose, FALSE )
@@ -1105,15 +1105,15 @@ end sub
 ' ========================================================================================
 ' Callbacks.
 ' ========================================================================================
-sub CMessageBox_SetPaintCallback( byval hMsgBox as HWND, byval usersub as MBX_PaintCallbackSub )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetPaintCallback( byval hMsgBox as HWND, byval usersub as MBX_PaintCallbackSub )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->PaintCallback = usersub
     if pBox->hWin then InvalidateRect( pBox->hWin, NULL, TRUE )
 end sub
 
-sub CMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval userfunc as MBX_MessageCallbackFunc )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_SetMessageCallback( byval hMsgBox as HWND, byval userfunc as MBX_MessageCallbackFunc )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
     pBox->MessageCallback = userfunc
 end sub
@@ -1126,10 +1126,10 @@ end sub
 ' THE CLAMP ORDER MATTERS. right/bottom first, then left/top, so a box taller than the work area
 ' ends up flush with the TOP rather than pushed off it. Work-area coordinates are freely
 ' negative on a multi-monitor desktop, which is exactly why the clamp is done against
-' MonitorFromPoint's answer instead of against screen metrics (CPopupMenu's arithmetic).
+' MonitorFromPoint's answer instead of against screen metrics (PsPopupMenu's arithmetic).
 ' ========================================================================================
-private sub CMessageBox_ComputeOrigin( _
-            byval pBox as CMESSAGEBOX ptr, _
+private sub PsMessageBox_ComputeOrigin( _
+            byval pBox as PSMESSAGEBOX ptr, _
             byval nBoxWidth  as long, _
             byval nBoxHeight as long, _
             byref x as long, _
@@ -1174,7 +1174,7 @@ end sub
 ' sounds are user-configurable, so a host that suppresses it is overriding a system preference
 ' rather than removing noise.
 ' ========================================================================================
-private sub CMessageBox_Beep( byval nKind as long )
+private sub PsMessageBox_Beep( byval nKind as long )
     select case nKind
     case MBX_ICON_ERROR    : MessageBeep( MB_ICONHAND )
     case MBX_ICON_WARNING  : MessageBeep( MB_ICONEXCLAMATION )
@@ -1192,13 +1192,13 @@ end sub
 ' of a control id we deliberately do not use as a host id -- handling it here keeps the cancel
 ' answer in ONE place (ResolveCancelID) instead of two.
 '
-' ENTER only when a button does NOT have the focus. A focused CButton claims Enter itself
+' ENTER only when a button does NOT have the focus. A focused PsButton claims Enter itself
 ' through WM_GETDLGCODE, and clicking THAT button is the right answer -- not the default one.
 ' Stealing Enter unconditionally here would make the default button fire no matter which button
 ' the user had tabbed to, which is the natural bug in this area.
 ' ========================================================================================
-private function CMessageBox_PreTranslate( _
-            byval pBox    as CMESSAGEBOX ptr, _
+private function PsMessageBox_PreTranslate( _
+            byval pBox    as PSMESSAGEBOX ptr, _
             byval hMsgBox as HWND, _
             byval pMsg    as MSG ptr _
             ) as boolean
@@ -1220,9 +1220,9 @@ private function CMessageBox_PreTranslate( _
             if hFocus = pBox->hButtons(i) then return false
         next
         if (pBox->nDefaultIndex >= 0) andalso (pBox->nDefaultIndex < pBox->nButtonCount) then
-            ' CButton_Click FIRES the click callback -- the documented exception to the family's
+            ' PsButton_Click FIRES the click callback -- the documented exception to the family's
             ' silent-setter rule, and the reason this works at all.
-            CButton_Click( pBox->hButtons( pBox->nDefaultIndex ) )
+            PsButton_Click( pBox->hButtons( pBox->nDefaultIndex ) )
             return true
         end if
     end select
@@ -1232,7 +1232,7 @@ end function
 
 
 ' ========================================================================================
-' CMessageBox_DoModal -- measure, size, centre, show, PUMP, and return the answer.
+' PsMessageBox_DoModal -- measure, size, centre, show, PUMP, and return the answer.
 '
 ' THE NESTED LOOP IS THIS CONTROL'S ONE BIG DEPARTURE from the rest of the family, which is
 ' passive and pumped by its host. Four things in here are the whole risk surface:
@@ -1252,10 +1252,10 @@ end function
 '
 '   4. IsDialogMessage IS OURS. It is what makes Tab walk the buttons, and it is why the host has
 '      no pump obligation at all. It only acts once a DESCENDANT has focus, hence the explicit
-'      SetFocus before the loop -- the second half of the CButton Tab bug in Learnings.md.
+'      SetFocus before the loop -- the second half of the PsButton Tab bug in Learnings.md.
 ' ========================================================================================
-function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+function PsMessageBox_DoModal( byval hMsgBox as HWND ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
 
     ' Captured now, because pBox may not survive the loop (see 1 above) and the parent still has
@@ -1271,12 +1271,12 @@ function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
     if nBoxHeight < 1 then nBoxHeight = 1
 
     dim as long x, y
-    CMessageBox_ComputeOrigin( pBox, nBoxWidth, nBoxHeight, x, y )
+    PsMessageBox_ComputeOrigin( pBox, nBoxWidth, nBoxHeight, x, y )
     ' This fires WM_SIZE, which re-lays out and positions the child buttons.
     SetWindowPos( hMsgBox, HWND_TOP, x, y, nBoxWidth, nBoxHeight, SWP_NOACTIVATE )
 
     ' Before the show, not after: a beep that lands after the paint reads as a delayed error.
-    if pBox->bBeep then CMessageBox_Beep( pBox->nIconKind )
+    if pBox->bBeep then PsMessageBox_Beep( pBox->nIconKind )
 
     ' ---- go modal ---------------------------------------------------------------------------
     ' Disable the parent BEFORE showing, so there is no frame in which both windows are live.
@@ -1296,7 +1296,7 @@ function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
     dim uMsg as MSG
     do
         if IsWindow( hMsgBox ) = 0 then exit do
-        dim as CMESSAGEBOX ptr pLoop = GetMessageBoxPointer( hMsgBox )
+        dim as PSMESSAGEBOX ptr pLoop = GetMessageBoxPointer( hMsgBox )
         if pLoop = 0 then exit do
         if pLoop->bRunning = false then exit do
 
@@ -1306,7 +1306,7 @@ function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
             exit do
         end if
 
-        if CMessageBox_PreTranslate( pLoop, hMsgBox, @uMsg ) = false then
+        if PsMessageBox_PreTranslate( pLoop, hMsgBox, @uMsg ) = false then
             if IsDialogMessageW( hMsgBox, @uMsg ) = 0 then
                 TranslateMessage( @uMsg )
                 DispatchMessageW( @uMsg )
@@ -1318,7 +1318,7 @@ function CMessageBox_DoModal( byval hMsgBox as HWND ) as long
     ' Read the answer while the window is still alive...
     dim as long nResult = 0
     if IsWindow( hMsgBox ) then
-        dim as CMESSAGEBOX ptr pEnd = GetMessageBoxPointer( hMsgBox )
+        dim as PSMESSAGEBOX ptr pEnd = GetMessageBoxPointer( hMsgBox )
         if pEnd then nResult = pEnd->nResult
     end if
 
@@ -1336,31 +1336,31 @@ end function
 
 
 ' ========================================================================================
-' CMessageBox_Show -- Create + configure + DoModal, for the common case.
+' PsMessageBox_Show -- Create + configure + DoModal, for the common case.
 '
 ' Everything it does is reachable through the long form; nothing here is privileged. A host that
 ' wants custom captions, a third button with its own id, a glyph override or its own colours
 ' builds the box itself.
 ' ========================================================================================
-function CMessageBox_Show( byval hWndParent as HWND, _
+function PsMessageBox_Show( byval hWndParent as HWND, _
                            byval Text as DWSTRING, _
                            byval Caption as DWSTRING, _
                            byval nIconKind as long = MBX_ICON_NONE, _
                            byval nPreset as long = MBX_BTN_OK ) as long
 
-    dim as HWND hBox = CMessageBox_Create( hWndParent )
+    dim as HWND hBox = PsMessageBox_Create( hWndParent )
     if hBox = 0 then return 0
 
-    CMessageBox_SetCaption( hBox, Caption )
-    CMessageBox_SetText( hBox, Text )
-    CMessageBox_SetIconKind( hBox, nIconKind )
-    CMessageBox_AddPreset( hBox, nPreset )
+    PsMessageBox_SetCaption( hBox, Caption )
+    PsMessageBox_SetText( hBox, Text )
+    PsMessageBox_SetIconKind( hBox, nIconKind )
+    PsMessageBox_AddPreset( hBox, nPreset )
 
     ' NOTE: no fonts are set here, so the box measures and draws with the stock GUI font and the
     ' icon codepoints come out as missing-glyph boxes. A host that has loaded Segoe Fluent Icons
     ' wants the long form, or its own wrapper around it. Documented in the README rather than
     ' papered over with a font this control would then have to own.
-    return CMessageBox_DoModal( hBox )
+    return PsMessageBox_DoModal( hBox )
 end function
 
 
@@ -1371,8 +1371,8 @@ end function
 ' Size the box to its ideal size WITHOUT showing it or entering the modal loop, so geometry can
 ' be asserted and the tone probe can run. There is no other way in: every rect this control owns
 ' depends on the client area, and the client area is otherwise only established by DoModal.
-sub CMessageBox_LayoutForTest( byval hMsgBox as HWND )
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+sub PsMessageBox_LayoutForTest( byval hMsgBox as HWND )
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then exit sub
 
     pBox->bLayoutDirty = true
@@ -1389,7 +1389,7 @@ sub CMessageBox_LayoutForTest( byval hMsgBox as HWND )
 end sub
 
 
-private function CMessageBox_PartRect( byval pBox as CMESSAGEBOX ptr, byval nPart as long ) as RECT
+private function PsMessageBox_PartRect( byval pBox as PSMESSAGEBOX ptr, byval nPart as long ) as RECT
     dim as RECT rc
     if pBox = 0 then return rc
     select case nPart
@@ -1405,9 +1405,9 @@ end function
 
 
 ' Render the box OFFSCREEN with its current painter and count the distinct colours inside one of
-' its rects. See the declaration in CMessageBox.bi for what this is for and why it is public.
-function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as long ) as long
-    dim as CMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
+' its rects. See the declaration in PsMessageBox.bi for what this is for and why it is public.
+function PsMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as long ) as long
+    dim as PSMESSAGEBOX ptr pBox = GetMessageBoxPointer(hMsgBox)
     if pBox = 0 then return 0
     if pBox->bLayoutDirty then pBox->LayoutBox()
     if pBox->bLayoutDirty then return 0          ' no client area yet
@@ -1418,7 +1418,7 @@ function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as l
     dim as long ch = rcClient.bottom - rcClient.top
     if (cw <= 0) orelse (ch <= 0) then return 0
 
-    dim as RECT rcPart = CMessageBox_PartRect( pBox, nPart )
+    dim as RECT rcPart = PsMessageBox_PartRect( pBox, nPart )
     if IsRectEmpty( @rcPart ) then return 0
 
     if rcPart.left   < 0  then rcPart.left   = 0
@@ -1435,7 +1435,7 @@ function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as l
         return 0
     end if
 
-    ' 32bpp top-down, matching what CBufferPaint.SetupBitmap builds, so the pixels we read are
+    ' 32bpp top-down, matching what PsBufferPaint.SetupBitmap builds, so the pixels we read are
     ' laid out the way the renderer wrote them.
     dim as BITMAPINFO bmi
     with bmi.bmiHeader
@@ -1462,7 +1462,7 @@ function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as l
     pBox->isCloseHot = true
 
     scope
-        dim as CBufferPaint b
+        dim as PsBufferPaint b
         ' Four-arg form: hMem is BOTH the blit target and the cached back buffer, so the final
         ' BitBlt is a self-copy and the bitmap survives EndDoubleBuffer for us to read.
         b.BeginDoubleBuffer( hMsgBox, hMem, rcClient, hMem )
@@ -1471,12 +1471,12 @@ function CMessageBox_CountRenderedTones( byval hMsgBox as HWND, byval nPart as l
         b.PaintClientRect()
 
         dim p as MBX_PAINTINFO
-        CMessageBox_FillPaintInfo( pBox, hMsgBox, @b, @p )
+        PsMessageBox_FillPaintInfo( pBox, hMsgBox, @b, @p )
 
         if pBox->PaintCallback then
             pBox->PaintCallback( @p )
         else
-            CMessageBox_RenderDefault( pBox, @b, @p )
+            PsMessageBox_RenderDefault( pBox, @b, @p )
         end if
 
         b.EndDoubleBuffer()
@@ -1514,10 +1514,10 @@ end function
 
 
 ' ========================================================================================
-' Self-test.  Gated on CMESSAGEBOX_SELFTEST=1.
+' Self-test.  Gated on PSMESSAGEBOX_SELFTEST=1.
 '
 ' NOTHING HERE ENTERS THE MODAL LOOP. Every assertion runs against a box that has been sized by
-' CMessageBox_LayoutForTest and never shown -- a self-test that went modal would block the host
+' PsMessageBox_LayoutForTest and never shown -- a self-test that went modal would block the host
 ' it was called from and could not report anything.
 ' ========================================================================================
 dim shared as long gMBX_TestCount
@@ -1543,12 +1543,12 @@ private function MBXTest_RectStr( byref rc as RECT ) as string
 end function
 
 
-sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
-    if environ("CMESSAGEBOX_SELFTEST") <> "1" then exit sub
+sub PsMessageBox_RunSelfTest( byval hWndParent as HWND )
+    if environ("PSMESSAGEBOX_SELFTEST") <> "1" then exit sub
 
     gMBX_TestCount = 0
     gMBX_FailCount = 0
-    print "=== CMessageBox self-test ==="
+    print "=== PsMessageBox self-test ==="
 
     dim as string sD
 
@@ -1556,48 +1556,48 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     ' These take no control pointer and touch no global, which is the whole reason they exist as
     ' separate functions: the mapping is a truth table, not something to eyeball in a paint.
     MBXTest_Check( "glyph: NONE resolves to nothing", _
-                   len( CMessageBox_ResolveGlyph( MBX_ICON_NONE ) ) = 0, "" )
+                   len( PsMessageBox_ResolveGlyph( MBX_ICON_NONE ) ) = 0, "" )
     MBXTest_Check( "glyph: INFO", _
-                   CMessageBox_ResolveGlyph( MBX_ICON_INFO ) = wchr(CMESSAGEBOX_GLYPH_INFO), "" )
+                   PsMessageBox_ResolveGlyph( MBX_ICON_INFO ) = wchr(PSMESSAGEBOX_GLYPH_INFO), "" )
     MBXTest_Check( "glyph: WARNING", _
-                   CMessageBox_ResolveGlyph( MBX_ICON_WARNING ) = wchr(CMESSAGEBOX_GLYPH_WARNING), "" )
+                   PsMessageBox_ResolveGlyph( MBX_ICON_WARNING ) = wchr(PSMESSAGEBOX_GLYPH_WARNING), "" )
     MBXTest_Check( "glyph: ERROR", _
-                   CMessageBox_ResolveGlyph( MBX_ICON_ERROR ) = wchr(CMESSAGEBOX_GLYPH_ERROR), "" )
+                   PsMessageBox_ResolveGlyph( MBX_ICON_ERROR ) = wchr(PSMESSAGEBOX_GLYPH_ERROR), "" )
     MBXTest_Check( "glyph: QUESTION", _
-                   CMessageBox_ResolveGlyph( MBX_ICON_QUESTION ) = wchr(CMESSAGEBOX_GLYPH_QUESTION), "" )
+                   PsMessageBox_ResolveGlyph( MBX_ICON_QUESTION ) = wchr(PSMESSAGEBOX_GLYPH_QUESTION), "" )
 
     scope
         dim c as MBX_COLORS
         MBXTest_Check( "icon colour: INFO", _
-                       CMessageBox_ResolveIconColor( MBX_ICON_INFO, @c ) = c.IconColorInfo, "" )
+                       PsMessageBox_ResolveIconColor( MBX_ICON_INFO, @c ) = c.IconColorInfo, "" )
         MBXTest_Check( "icon colour: WARNING", _
-                       CMessageBox_ResolveIconColor( MBX_ICON_WARNING, @c ) = c.IconColorWarning, "" )
+                       PsMessageBox_ResolveIconColor( MBX_ICON_WARNING, @c ) = c.IconColorWarning, "" )
         MBXTest_Check( "icon colour: ERROR", _
-                       CMessageBox_ResolveIconColor( MBX_ICON_ERROR, @c ) = c.IconColorError, "" )
+                       PsMessageBox_ResolveIconColor( MBX_ICON_ERROR, @c ) = c.IconColorError, "" )
         MBXTest_Check( "icon colour: QUESTION", _
-                       CMessageBox_ResolveIconColor( MBX_ICON_QUESTION, @c ) = c.IconColorQuestion, "" )
+                       PsMessageBox_ResolveIconColor( MBX_ICON_QUESTION, @c ) = c.IconColorQuestion, "" )
         MBXTest_Check( "icon colour: NONE falls back to the body fore", _
-                       CMessageBox_ResolveIconColor( MBX_ICON_NONE, @c ) = c.ForeColor, "" )
+                       PsMessageBox_ResolveIconColor( MBX_ICON_NONE, @c ) = c.ForeColor, "" )
     end scope
 
     ' ---- the box under test ----------------------------------------------------------------
-    dim as HWND h = CMessageBox_Create( hWndParent )
+    dim as HWND h = PsMessageBox_Create( hWndParent )
     if h = 0 then
-        print "FAIL  create   [CMessageBox_Create returned 0]"
+        print "FAIL  create   [PsMessageBox_Create returned 0]"
         exit sub
     end if
-    dim as CMESSAGEBOX ptr pB = GetMessageBoxPointer(h)
+    dim as PSMESSAGEBOX ptr pB = GetMessageBoxPointer(h)
     if pB = 0 then
         print "FAIL  create   [no state pointer]"
         DestroyWindow(h)
         exit sub
     end if
 
-    CMessageBox_SetCaption( h, "Warning" )
-    CMessageBox_SetText( h, "This buffer contains unsaved edits. Do you want to save it?" )
-    CMessageBox_SetIconKind( h, MBX_ICON_WARNING )
-    CMessageBox_AddPreset( h, MBX_BTN_SAVE_DONTSAVE_CANCEL )
-    CMessageBox_LayoutForTest( h )
+    PsMessageBox_SetCaption( h, "Warning" )
+    PsMessageBox_SetText( h, "This buffer contains unsaved edits. Do you want to save it?" )
+    PsMessageBox_SetIconKind( h, MBX_ICON_WARNING )
+    PsMessageBox_AddPreset( h, MBX_BTN_SAVE_DONTSAVE_CANCEL )
+    PsMessageBox_LayoutForTest( h )
 
     dim as RECT rcClient
     GetClientRect( h, @rcClient )
@@ -1607,12 +1607,12 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     MBXTest_Check( "sized before ever being shown", (cw > 0) andalso (ch > 0), sD )
 
     dim as RECT rcCap, rcClose, rcBody, rcText, rcIcon, rcFoot
-    CMessageBox_GetCaptionRect( h, rcCap )
-    CMessageBox_GetCloseRect( h, rcClose )
-    CMessageBox_GetBodyRect( h, rcBody )
-    CMessageBox_GetTextRect( h, rcText )
-    CMessageBox_GetIconRect( h, rcIcon )
-    CMessageBox_GetFooterRect( h, rcFoot )
+    PsMessageBox_GetCaptionRect( h, rcCap )
+    PsMessageBox_GetCloseRect( h, rcClose )
+    PsMessageBox_GetBodyRect( h, rcBody )
+    PsMessageBox_GetTextRect( h, rcText )
+    PsMessageBox_GetIconRect( h, rcIcon )
+    PsMessageBox_GetFooterRect( h, rcFoot )
 
     ' ---- 2. the three bands tile the client exactly, with no gap and no overlap -------------
     ' Asserted against each OTHER rather than against the fields they were computed from, so a
@@ -1679,15 +1679,15 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     MBXTest_Check( "icon and text share a vertical centre", abs(iconMid - textMid) <= 1, sD )
 
     ' ---- 5. the buttons -----------------------------------------------------------------------
-    MBXTest_Check( "preset added three buttons", CMessageBox_GetButtonCount(h) = 3, _
-                   "count=" & str(CMessageBox_GetButtonCount(h)) )
+    MBXTest_Check( "preset added three buttons", PsMessageBox_GetButtonCount(h) = 3, _
+                   "count=" & str(PsMessageBox_GetButtonCount(h)) )
     MBXTest_Check( "a fourth button is refused", _
-                   CMessageBox_AddButton( h, "Extra", 99 ) = 0, "" )
+                   PsMessageBox_AddButton( h, "Extra", 99 ) = 0, "" )
 
     dim as RECT rb0, rb1, rb2
-    CMessageBox_GetButtonRect( h, 0, rb0 )
-    CMessageBox_GetButtonRect( h, 1, rb1 )
-    CMessageBox_GetButtonRect( h, 2, rb2 )
+    PsMessageBox_GetButtonRect( h, 0, rb0 )
+    PsMessageBox_GetButtonRect( h, 1, rb1 )
+    PsMessageBox_GetButtonRect( h, 2, rb2 )
     sD = MBXTest_RectStr(rb0) & " " & MBXTest_RectStr(rb1) & " " & MBXTest_RectStr(rb2)
 
     MBXTest_Check( "last button is right-aligned to the footer padding", _
@@ -1714,35 +1714,35 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
 
     ' ---- 6. cancel-id resolution ---------------------------------------------------------------
     MBXTest_Check( "cancel unset resolves to the LAST button's id", _
-                   CMessageBox_GetCancelID(h) = IDCANCEL, _
-                   "id=" & str(CMessageBox_GetCancelID(h)) )
-    CMessageBox_SetCancelID( h, 4242 )
-    MBXTest_Check( "an explicit cancel id wins", CMessageBox_GetCancelID(h) = 4242, "" )
+                   PsMessageBox_GetCancelID(h) = IDCANCEL, _
+                   "id=" & str(PsMessageBox_GetCancelID(h)) )
+    PsMessageBox_SetCancelID( h, 4242 )
+    MBXTest_Check( "an explicit cancel id wins", PsMessageBox_GetCancelID(h) = 4242, "" )
 
     ' ---- 7. default and focus, and the precedence between them ----------------------------------
     ' The preset made button 0 default and nothing has called SetFocusButton, so focus follows.
-    MBXTest_Check( "preset made button 0 the default", CMessageBox_GetDefaultButton(h) = 0, _
-                   "idx=" & str(CMessageBox_GetDefaultButton(h)) )
+    MBXTest_Check( "preset made button 0 the default", PsMessageBox_GetDefaultButton(h) = 0, _
+                   "idx=" & str(PsMessageBox_GetDefaultButton(h)) )
     MBXTest_Check( "focus follows the default when not set explicitly", _
-                   CMessageBox_GetFocusButton(h) = 0, _
-                   "idx=" & str(CMessageBox_GetFocusButton(h)) )
-    CMessageBox_SetDefaultButton( h, 1 )
-    MBXTest_Check( "focus follows a CHANGED default", CMessageBox_GetFocusButton(h) = 1, _
-                   "idx=" & str(CMessageBox_GetFocusButton(h)) )
+                   PsMessageBox_GetFocusButton(h) = 0, _
+                   "idx=" & str(PsMessageBox_GetFocusButton(h)) )
+    PsMessageBox_SetDefaultButton( h, 1 )
+    MBXTest_Check( "focus follows a CHANGED default", PsMessageBox_GetFocusButton(h) = 1, _
+                   "idx=" & str(PsMessageBox_GetFocusButton(h)) )
     MBXTest_Check( "only one button carries the default border", _
-                   (CButton_GetDefault( CMessageBox_GetButtonHandle(h,0) ) = false) andalso _
-                   (CButton_GetDefault( CMessageBox_GetButtonHandle(h,1) ) = true) andalso _
-                   (CButton_GetDefault( CMessageBox_GetButtonHandle(h,2) ) = false), "" )
-    CMessageBox_SetFocusButton( h, 2 )
+                   (PsButton_GetDefault( PsMessageBox_GetButtonHandle(h,0) ) = false) andalso _
+                   (PsButton_GetDefault( PsMessageBox_GetButtonHandle(h,1) ) = true) andalso _
+                   (PsButton_GetDefault( PsMessageBox_GetButtonHandle(h,2) ) = false), "" )
+    PsMessageBox_SetFocusButton( h, 2 )
     MBXTest_Check( "an explicit focus button overrides the default", _
-                   CMessageBox_GetFocusButton(h) = 2, _
-                   "idx=" & str(CMessageBox_GetFocusButton(h)) )
+                   PsMessageBox_GetFocusButton(h) = 2, _
+                   "idx=" & str(PsMessageBox_GetFocusButton(h)) )
     MBXTest_Check( "...and does NOT move the default border", _
-                   CMessageBox_GetDefaultButton(h) = 1, "" )
+                   PsMessageBox_GetDefaultButton(h) = 1, "" )
 
     ' ---- 8. tab navigability, end to end --------------------------------------------------------
     ' CWindow.Create defaults dwExStyle to WS_EX_CONTROLPARENT OR WS_EX_WINDOWEDGE. For a LEAF
-    ' control that flag is fatal (CButton shipped broken with it); for THIS window it is
+    ' control that flag is fatal (PsButton shipped broken with it); for THIS window it is
     ' REQUIRED, because the tabstops are its children. Both halves are asserted, because the flag
     ' is invisible at the call site that causes it.
     dim as ulong exStyle = cast( ulong, GetWindowLongPtr( h, GWL_EXSTYLE ) )
@@ -1753,7 +1753,7 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     MBXTest_Check( "the box itself is NOT a tabstop", (wsStyle and WS_TABSTOP) = 0, sD )
 
     for i as long = 0 to 2
-        dim as HWND hb = CMessageBox_GetButtonHandle( h, i )
+        dim as HWND hb = PsMessageBox_GetButtonHandle( h, i )
         dim as ulong bEx = cast( ulong, GetWindowLongPtr( hb, GWL_EXSTYLE ) )
         dim as ulong bSt = cast( ulong, GetWindowLongPtr( hb, GWL_STYLE ) )
         sD = "button " & str(i) & " exstyle=&h" & hex(bEx) & " style=&h" & hex(bSt)
@@ -1762,7 +1762,7 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     next
 
     ' End to end: walk the dialog manager's own answer. This is the assertion that would have
-    ' caught CButton's bug, and it is the only one here that tests what the USER experiences
+    ' caught PsButton's bug, and it is the only one here that tests what the USER experiences
     ' rather than what a style bit says.
     scope
         dim as HWND hFirst = GetNextDlgTabItem( h, NULL, FALSE )
@@ -1772,16 +1772,16 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
         sD = "ids " & str(GetDlgCtrlID(hFirst)) & " " & str(GetDlgCtrlID(hNext1)) & " " & _
              str(GetDlgCtrlID(hNext2)) & " -> " & str(GetDlgCtrlID(hWrap))
         MBXTest_Check( "Tab reaches every button and cycles", _
-                       (hFirst = CMessageBox_GetButtonHandle(h,0)) andalso _
-                       (hNext1 = CMessageBox_GetButtonHandle(h,1)) andalso _
-                       (hNext2 = CMessageBox_GetButtonHandle(h,2)) andalso _
+                       (hFirst = PsMessageBox_GetButtonHandle(h,0)) andalso _
+                       (hNext1 = PsMessageBox_GetButtonHandle(h,1)) andalso _
+                       (hNext2 = PsMessageBox_GetButtonHandle(h,2)) andalso _
                        (hWrap  = hFirst), sD )
         MBXTest_Check( "Shift+Tab walks the other way", _
-                       GetNextDlgTabItem( h, hFirst, TRUE ) = CMessageBox_GetButtonHandle(h,2), sD )
+                       GetNextDlgTabItem( h, hFirst, TRUE ) = PsMessageBox_GetButtonHandle(h,2), sD )
     end scope
 
     ' ---- 9. the offscreen tone probe -------------------------------------------------------------
-    ' THE THRESHOLDS ARE NOT "> 1", AND THAT IS THE POINT. CButton can use "> 1" because a wiped
+    ' THE THRESHOLDS ARE NOT "> 1", AND THAT IS THE POINT. PsButton can use "> 1" because a wiped
     ' button really is one flat colour. This control cannot: its bands span the full width, so
     ' the window border strokes through EVERY one of them and a fully flooded box still measures
     ' 2 tones per band. A "> 1" assertion here passes on a completely destroyed render.
@@ -1802,10 +1802,10 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     ' just filled with. The probe catches a flood that crosses bands, not one that repaints a
     ' band in its own colour.
     scope
-        dim as long tCap   = CMessageBox_CountRenderedTones( h, MBX_PART_CAPTION )
-        dim as long tBody  = CMessageBox_CountRenderedTones( h, MBX_PART_BODY )
-        dim as long tFoot  = CMessageBox_CountRenderedTones( h, MBX_PART_FOOTER )
-        dim as long tClose = CMessageBox_CountRenderedTones( h, MBX_PART_CLOSE )
+        dim as long tCap   = PsMessageBox_CountRenderedTones( h, MBX_PART_CAPTION )
+        dim as long tBody  = PsMessageBox_CountRenderedTones( h, MBX_PART_BODY )
+        dim as long tFoot  = PsMessageBox_CountRenderedTones( h, MBX_PART_FOOTER )
+        dim as long tClose = PsMessageBox_CountRenderedTones( h, MBX_PART_CLOSE )
         sD = "caption=" & str(tCap) & " body=" & str(tBody) & " footer=" & str(tFoot) & _
              " close=" & str(tClose) & "   (flooded reads 2/2/2/2)"
         MBXTest_Check( "caption band renders its title, not a flood", (tCap >= 10), sD )
@@ -1820,23 +1820,23 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     ' A SECOND box, because these need different content and the assertions above are all about
     ' the first one's fixed geometry.
     scope
-        dim as HWND h2 = CMessageBox_Create( hWndParent )
+        dim as HWND h2 = PsMessageBox_Create( hWndParent )
         if h2 = 0 then
-            print "FAIL  create #2   [CMessageBox_Create returned 0]"
+            print "FAIL  create #2   [PsMessageBox_Create returned 0]"
         else
-            dim as CMESSAGEBOX ptr p2 = GetMessageBoxPointer(h2)
-            CMessageBox_SetCaption( h2, "Question" )
-            CMessageBox_AddPreset( h2, MBX_BTN_OK )
-            CMessageBox_SetMinWidth( h2, 0 )       ' out of the way, so shrink-to-fit is visible
+            dim as PSMESSAGEBOX ptr p2 = GetMessageBoxPointer(h2)
+            PsMessageBox_SetCaption( h2, "Question" )
+            PsMessageBox_AddPreset( h2, MBX_BTN_OK )
+            PsMessageBox_SetMinWidth( h2, 0 )       ' out of the way, so shrink-to-fit is visible
 
             dim as long w1, hh1, w2, hh2
-            CMessageBox_SetText( h2, "Short." )
-            CMessageBox_GetIdealSize( h2, w1, hh1 )
+            PsMessageBox_SetText( h2, "Short." )
+            PsMessageBox_GetIdealSize( h2, w1, hh1 )
 
-            CMessageBox_SetText( h2, "This is a considerably longer message that is certain " & _
+            PsMessageBox_SetText( h2, "This is a considerably longer message that is certain " & _
                                      "to wrap onto several separate lines once the maximum " & _
                                      "width has been applied to it by the layout pass." )
-            CMessageBox_GetIdealSize( h2, w2, hh2 )
+            PsMessageBox_GetIdealSize( h2, w2, hh2 )
 
             sD = "short " & str(w1) & "x" & str(hh1) & "  long " & str(w2) & "x" & str(hh2)
             MBXTest_Check( "a wrapped message is TALLER than a one-liner", (hh2 > hh1), sD )
@@ -1852,14 +1852,14 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
             ' min-width), so the icon's 48px never reached the total and the test was measuring
             ' the max() rather than the icon. It failed honestly, which is the only reason the
             ' scaffolding error was visible at all.
-            CMessageBox_SetText( h2, "Long enough that the text block, not the footer, decides." )
-            CMessageBox_SetIconKind( h2, MBX_ICON_INFO )
+            PsMessageBox_SetText( h2, "Long enough that the text block, not the footer, decides." )
+            PsMessageBox_SetIconKind( h2, MBX_ICON_INFO )
             dim as long wIcon, hIcon
-            CMessageBox_GetIdealSize( h2, wIcon, hIcon )
+            PsMessageBox_GetIdealSize( h2, wIcon, hIcon )
             dim as long textHIcon = p2->nTextBlockH
-            CMessageBox_SetIconKind( h2, MBX_ICON_NONE )
+            PsMessageBox_SetIconKind( h2, MBX_ICON_NONE )
             dim as long wNone, hNone
-            CMessageBox_GetIdealSize( h2, wNone, hNone )
+            PsMessageBox_GetIdealSize( h2, wNone, hNone )
             dim as long textHNone = p2->nTextBlockH
             sD = "with icon " & str(wIcon) & "  without " & str(wNone) & _
                  "  iconW+gap=" & str(p2->nIconWidth + p2->nIconGap)
@@ -1872,12 +1872,12 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
             MBXTest_Check( "removing the icon gives back the cell AND the gap", _
                            (wIcon - wNone) = (p2->nIconWidth + p2->nIconGap), sD )
 
-            CMessageBox_SetText( h2, "Short." )
-            CMessageBox_SetIconKind( h2, MBX_ICON_NONE )
-            CMessageBox_LayoutForTest( h2 )
+            PsMessageBox_SetText( h2, "Short." )
+            PsMessageBox_SetIconKind( h2, MBX_ICON_NONE )
+            PsMessageBox_LayoutForTest( h2 )
             dim as RECT rcI2, rcT2
-            CMessageBox_GetIconRect( h2, rcI2 )
-            CMessageBox_GetTextRect( h2, rcT2 )
+            PsMessageBox_GetIconRect( h2, rcI2 )
+            PsMessageBox_GetTextRect( h2, rcT2 )
             sD = "icon " & MBXTest_RectStr(rcI2) & " text " & MBXTest_RectStr(rcT2)
             MBXTest_Check( "no icon = EMPTY rect, not a zero-width one", _
                            IsRectEmpty( @rcI2 ) <> 0, sD )
@@ -1885,17 +1885,17 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
                            (rcT2.left = p2->nBodyPadX), sD )
 
             ' A glyph override is an unambiguous request for an icon and must beat ICON_NONE.
-            CMessageBox_SetGlyph( h2, wchr(CMESSAGEBOX_GLYPH_INFO) )
-            CMessageBox_LayoutForTest( h2 )
-            CMessageBox_GetIconRect( h2, rcI2 )
+            PsMessageBox_SetGlyph( h2, wchr(PSMESSAGEBOX_GLYPH_INFO) )
+            PsMessageBox_LayoutForTest( h2 )
+            PsMessageBox_GetIconRect( h2, rcI2 )
             MBXTest_Check( "a glyph override turns the icon on even with kind NONE", _
                            IsRectEmpty( @rcI2 ) = 0, MBXTest_RectStr(rcI2) )
 
             ' One button, cancel unset -> that button. The single-button case is the one where
             ' "the last button" and "the only button" have to agree.
             MBXTest_Check( "one button, cancel unset, resolves to it", _
-                           CMessageBox_GetCancelID(h2) = IDOK, _
-                           "id=" & str(CMessageBox_GetCancelID(h2)) )
+                           PsMessageBox_GetCancelID(h2) = IDOK, _
+                           "id=" & str(PsMessageBox_GetCancelID(h2)) )
 
             DestroyWindow( h2 )
         end if
@@ -1906,20 +1906,20 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
     ' rather than being clipped -- that is the max() in LayoutBox, and it is an easy thing to
     ' write as a clamp by mistake.
     scope
-        dim as HWND h3 = CMessageBox_Create( hWndParent )
+        dim as HWND h3 = PsMessageBox_Create( hWndParent )
         if h3 then
-            CMessageBox_SetText( h3, "Hi." )
-            CMessageBox_SetMaxWidth( h3, 200 )
-            CMessageBox_SetMinWidth( h3, 0 )
-            CMessageBox_AddButton( h3, "A considerably long caption", 1 )
-            CMessageBox_AddButton( h3, "Another very long caption", 2 )
-            CMessageBox_AddButton( h3, "And a third long one", 3 )
-            CMessageBox_LayoutForTest( h3 )
+            PsMessageBox_SetText( h3, "Hi." )
+            PsMessageBox_SetMaxWidth( h3, 200 )
+            PsMessageBox_SetMinWidth( h3, 0 )
+            PsMessageBox_AddButton( h3, "A considerably long caption", 1 )
+            PsMessageBox_AddButton( h3, "Another very long caption", 2 )
+            PsMessageBox_AddButton( h3, "And a third long one", 3 )
+            PsMessageBox_LayoutForTest( h3 )
 
             dim as long w3, h3h
-            CMessageBox_GetIdealSize( h3, w3, h3h )
+            PsMessageBox_GetIdealSize( h3, w3, h3h )
             dim as RECT rl
-            CMessageBox_GetButtonRect( h3, 0, rl )
+            PsMessageBox_GetButtonRect( h3, 0, rl )
             sD = "ideal " & str(w3) & " maxWidth=200 firstBtn " & MBXTest_RectStr(rl)
             MBXTest_Check( "long buttons widen the box past the wrap width", (w3 > 200), sD )
             MBXTest_Check( "...and no button is pushed off the left edge", (rl.left >= 0), sD )
@@ -1927,7 +1927,7 @@ sub CMessageBox_RunSelfTest( byval hWndParent as HWND )
         end if
     end scope
 
-    dim as string sSummary = "=== CMessageBox self-test: " & str(gMBX_TestCount) & " checks, " & _
+    dim as string sSummary = "=== PsMessageBox self-test: " & str(gMBX_TestCount) & " checks, " & _
                              str(gMBX_FailCount) & " failed ==="
     print sSummary
 end sub

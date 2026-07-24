@@ -1,19 +1,19 @@
 ''
-''  CButton.inc  --  owner-drawn command button (glyph + caption + glyph)
+''  PsButton.inc  --  owner-drawn command button (glyph + caption + glyph)
 ''
 
-#include once "CButton.bi"
+#include once "PsButton.bi"
 
 
 ' Forward declaration: the content setters re-apply auto-size, and they are defined well above
 ' the layout section where it lives.
-declare sub CButton_ApplyAutoSize( byval pBtn as CBUTTON ptr )
+declare sub PsButton_ApplyAutoSize( byval pBtn as PSBUTTON ptr )
 
 
-function GetButtonPointer( byval hButton as HWND ) as CBUTTON ptr
+function GetButtonPointer( byval hButton as HWND ) as PSBUTTON ptr
     dim pWindow as CWindow ptr = AfxCWindowPtr(hButton)
     if pWindow = 0 then return 0
-    return cast( CBUTTON ptr, pWindow->UserData(0) )
+    return cast( PSBUTTON ptr, pWindow->UserData(0) )
 end function
 
 
@@ -22,12 +22,12 @@ end function
 '
 ' Callers decide whether to honor that answer -- three messages deliberately do not.
 ' WM_LBUTTONUP is one of them here, because this control HOLDS MOUSE CAPTURE across a press
-' and the up-message is what releases it. That reverses the contract in CComboBox, which this
+' and the up-message is what releases it. That reverses the contract in PsComboBox, which this
 ' file was seeded from: a "no capture, result honoured" note copied in from there would be a
 ' lie.
 ' ========================================================================================
-private function CButton_CallMessage( _
-            byval pBtn   as CBUTTON ptr, _
+private function PsButton_CallMessage( _
+            byval pBtn   as PSBUTTON ptr, _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
@@ -37,7 +37,7 @@ private function CButton_CallMessage( _
     if pBtn = 0 then return false
     if pBtn->MessageCallback = 0 then return false
 
-    dim as CBUTTON_MESSAGEINFO m
+    dim as PSBUTTON_MESSAGEINFO m
     m.hButton = hwnd
     m.uMsg    = uMsg
     m.wParam  = wParam
@@ -49,7 +49,7 @@ end function
 ' Resolve the tooltip text: the control's own text if it has any, else the host callback.
 ' NO CAPTION FALLBACK -- a button's caption is already on screen, so falling back to it would
 ' pop a tip that repeats what the user is looking at.
-private function CButton_ResolveTooltipText( byval pBtn as CBUTTON ptr ) as DWSTRING
+private function PsButton_ResolveTooltipText( byval pBtn as PSBUTTON ptr ) as DWSTRING
     if pBtn = 0 then return ""
     if len( pBtn->wszTooltip ) then
         dim as DWSTRING wszOut = pBtn->wszTooltip
@@ -63,10 +63,10 @@ end function
 ' ========================================================================================
 ' Draw the button: chrome, left glyph, caption, right glyph, focus ring.
 '
-' Nothing in here touches a GDI object or a device context -- CBufferPaint owns rendering and
+' Nothing in here touches a GDI object or a device context -- PsBufferPaint owns rendering and
 ' this control owns geometry and state, which is the family contract.
 '
-' THE COLOURS COME OUT OF CButton_ResolveMood + CButton_ResolveColors, not out of an if-chain
+' THE COLOURS COME OUT OF PsButton_ResolveMood + PsButton_ResolveColors, not out of an if-chain
 ' written inline here. That is what lets the self-test assert the precedence and the isDefault
 ' border overlay directly, instead of only being able to look at pixels.
 '
@@ -75,10 +75,10 @@ end function
 ' degenerate caption span (the client too narrow to leave any room) drops out of the same test
 ' rather than needing its own.
 ' ========================================================================================
-private sub CButton_RenderDefault( _
-            byval pBtn as CBUTTON ptr, _
-            byval b    as CBufferPaint ptr, _
-            byval p    as CBUTTON_PAINTINFO ptr _
+private sub PsButton_RenderDefault( _
+            byval pBtn as PSBUTTON ptr, _
+            byval b    as PsBufferPaint ptr, _
+            byval p    as PSBUTTON_PAINTINFO ptr _
             )
 
     if (pBtn = 0) orelse (b = 0) orelse (p = 0) then exit sub
@@ -88,13 +88,13 @@ private sub CButton_RenderDefault( _
     if (bw <= 0) orelse (bh <= 0) then exit sub
 
     ' ---- which four colors -------------------------------------------------------------
-    dim as long nMood = CButton_ResolveMood( p->isEnabled, p->isPressed, p->isHot )
+    dim as long nMood = PsButton_ResolveMood( p->isEnabled, p->isPressed, p->isHot )
     dim as COLORREF clrBack, clrFore, clrBorder, clrIcon
-    CButton_ResolveColors( @pBtn->colors, nMood, p->isDefault, _
+    PsButton_ResolveColors( @pBtn->colors, nMood, p->isDefault, _
                            clrBack, clrFore, clrBorder, clrIcon )
 
     ' ---- the chrome --------------------------------------------------------------------
-    ' nCurvature is an ellipse DIAMETER (CBufferPaint keeps GDI's vocabulary and halves it
+    ' nCurvature is an ellipse DIAMETER (PsBufferPaint keeps GDI's vocabulary and halves it
     ' internally). Zero gives square corners through the same call.
     dim as RECT rcBtn = p->rcButton
     b->SetBackColor( clrBack )
@@ -107,7 +107,7 @@ private sub CButton_RenderDefault( _
 
     ' ---- the fonts ---------------------------------------------------------------------
     ' Paint the caption with the SAME font the measuring pass used -- the caller's if set, else
-    ' the stock GUI font. CBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
+    ' the stock GUI font. PsBufferPaint.SetFont IGNORES a null handle, so leaving it unset would
     ' silently paint in the DC's font while the width was measured in another, and long
     ' captions would clip for no visible reason.
     dim as HFONT hTextUse = pBtn->hTextFont
@@ -179,11 +179,11 @@ end sub
 ' Fill a PAINTINFO from the control's current state and geometry. One place, so the WM_PAINT
 ' path and the self-test's offscreen probe cannot describe the control differently.
 ' ========================================================================================
-private sub CButton_FillPaintInfo( _
-            byval pBtn as CBUTTON ptr, _
+private sub PsButton_FillPaintInfo( _
+            byval pBtn as PSBUTTON ptr, _
             byval hwnd as HWND, _
-            byval b    as CBufferPaint ptr, _
-            byval p    as CBUTTON_PAINTINFO ptr _
+            byval b    as PsBufferPaint ptr, _
+            byval p    as PSBUTTON_PAINTINFO ptr _
             )
 
     if (pBtn = 0) orelse (p = 0) then exit sub
@@ -211,33 +211,33 @@ end sub
 ' ========================================================================================
 ' Process WM_PAINT.
 ' ========================================================================================
-private function CButton_OnPaint( byval hwnd as HWND ) as LRESULT
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hwnd)
+private function PsButton_OnPaint( byval hwnd as HWND ) as LRESULT
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hwnd)
     if pBtn = null then return 0
 
     ' Consume any pending layout before painting -- this is what makes layout lazy.
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
 
-    dim as CBufferPaint b
+    dim as PsBufferPaint b
     b.BeginDoubleBuffer(hwnd)
 
     ' The client is filled with the resolved mood's own background, not a fixed one, so a paint
     ' callback that draws only a foreground still sits on the right colour. Resolved through
     ' the same two functions the painter uses, so the fill can never disagree with the chrome.
-    dim as long nMood = CButton_ResolveMood( pBtn->isEnabled, pBtn->isPressed, pBtn->isHot )
+    dim as long nMood = PsButton_ResolveMood( pBtn->isEnabled, pBtn->isPressed, pBtn->isHot )
     dim as COLORREF clrFill, clrFore, clrBorder, clrIcon
-    CButton_ResolveColors( @pBtn->colors, nMood, pBtn->isDefault, _
+    PsButton_ResolveColors( @pBtn->colors, nMood, pBtn->isDefault, _
                            clrFill, clrFore, clrBorder, clrIcon )
     b.SetBackColor( clrFill )
     b.PaintClientRect()
 
-    dim p as CBUTTON_PAINTINFO
-    CButton_FillPaintInfo( pBtn, hwnd, @b, @p )
+    dim p as PSBUTTON_PAINTINFO
+    PsButton_FillPaintInfo( pBtn, hwnd, @b, @p )
 
     if pBtn->PaintCallback then
         pBtn->PaintCallback( @p )
     else
-        CButton_RenderDefault( pBtn, @b, @p )
+        PsButton_RenderDefault( pBtn, @b, @p )
     end if
 
     b.EndDoubleBuffer()
@@ -249,7 +249,7 @@ end function
 ' Clear the hover state and stop the hover poll timer. Repaints only if the state actually
 ' changes, so this is cheap to call repeatedly.
 ' ========================================================================================
-private sub CButton_ClearHot( byval pBtn as CBUTTON ptr, byval hwnd as HWND )
+private sub PsButton_ClearHot( byval pBtn as PSBUTTON ptr, byval hwnd as HWND )
     if pBtn = 0 then exit sub
     if pBtn->hotTimerOn then
         KillTimer( hwnd, IDT_CBUTTON_HOTTRACK )
@@ -264,14 +264,14 @@ end sub
 
 ' ========================================================================================
 ' Apply the ideal size to ourselves, preserving the top-left. Only runs when the host has
-' opted in with CButton_SetAutoSize -- the family default is that a control never moves itself
+' opted in with PsButton_SetAutoSize -- the family default is that a control never moves itself
 ' and the host measures with GetIdealSize.
 '
 ' Called from every mutator that can change the ideal size. It forces the pending layout first
 ' (that is where the measurement happens), then resizes -- which marks the layout dirty again
 ' through WM_SIZE, so the rects are re-derived against the new client area.
 ' ========================================================================================
-sub CButton_ApplyAutoSize( byval pBtn as CBUTTON ptr )
+sub PsButton_ApplyAutoSize( byval pBtn as PSBUTTON ptr )
     if pBtn = 0 then exit sub
     if pBtn->bAutoSize = false then exit sub
     if pBtn->hWin = 0 then exit sub
@@ -286,12 +286,12 @@ end sub
 
 ' ========================================================================================
 ' The one activation path. A completed mouse click, Space/Enter, and the programmatic
-' CButton_Click all come through here, so keyboard, mouse and host can never drift apart.
+' PsButton_Click all come through here, so keyboard, mouse and host can never drift apart.
 '
 ' It reads isEnabled again rather than trusting the caller: a message callback may have
 ' disabled the control mid-gesture.
 ' ========================================================================================
-private sub CButton_FireClick( byval pBtn as CBUTTON ptr, byval hwnd as HWND )
+private sub PsButton_FireClick( byval pBtn as PSBUTTON ptr, byval hwnd as HWND )
     if pBtn = 0 then exit sub
     if pBtn->isEnabled = false then exit sub
     if pBtn->ClickCallback = 0 then exit sub
@@ -300,7 +300,7 @@ end sub
 
 
 ' ========================================================================================
-' CButton Window procedure
+' PsButton Window procedure
 '
 ' This control has no child windows, so there is nothing to subclass: every message is handled
 ' here and anything unhandled goes to DefWindowProc.
@@ -312,31 +312,31 @@ end sub
 ' handler that cancels it, a release in WM_DESTROY, and a callback result that is ignored for
 ' the up-message.
 '
-' NOTE this control fires on the UP, unlike CComboBox (which opens its list on the DOWN) and
-' CNumericUpDown (which steps on the DOWN and uses capture to bound an auto-repeat). Same
+' NOTE this control fires on the UP, unlike PsComboBox (which opens its list on the DOWN) and
+' PsNumericUpDown (which steps on the DOWN and uses capture to bound an auto-repeat). Same
 ' obligation, a third distinct justification.
 '
-' CS_DBLCLKS IS DELIBERATELY *NOT* SET, which is CToggle's and CIconPanel's call rather than
-' CSelectBar's. With it, the second of two rapid clicks arrives as WM_LBUTTONDBLCLK INSTEAD OF
+' CS_DBLCLKS IS DELIBERATELY *NOT* SET, which is PsToggle's and PsIconPanel's call rather than
+' PsSelectBar's. With it, the second of two rapid clicks arrives as WM_LBUTTONDBLCLK INSTEAD OF
 ' a second WM_LBUTTONDOWN -- and on a momentary command button a rapid second click is a
 ' legitimate second click, which would be silently swallowed.
 '
-' FOCUS: this is the third focusable control in the family, after CToggle and CComboBox. See
+' FOCUS: this is the third focusable control in the family, after PsToggle and PsComboBox. See
 ' the WM_GETDLGCODE handler for the one subtlety that needed care.
 ' ========================================================================================
-function CButton_WndProc( _
+function PsButton_WndProc( _
             byval hwnd   as HWND, _
             byval uMsg   as UINT, _
             byval wParam as WPARAM, _
             byval lParam as LPARAM _
             ) as LRESULT
 
-    dim as CBUTTON ptr pBtn = GetButtonPointer( hwnd )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer( hwnd )
 
     select case uMsg
 
     case WM_PAINT
-        return CButton_OnPaint( hwnd )
+        return PsButton_OnPaint( hwnd )
 
     case WM_ERASEBKGND
         ' Never erase: WM_PAINT fills the whole client through the double buffer, so a
@@ -363,7 +363,7 @@ function CButton_WndProc( _
                 dim as RECT rcClient
                 GetClientRect( hwnd, @rcClient )
                 if isMouseOverRECT( hwnd, rcClient ) = false then
-                    CButton_ClearHot( pBtn, hwnd )
+                    PsButton_ClearHot( pBtn, hwnd )
                 end if
             end if
             return 0
@@ -388,7 +388,7 @@ function CButton_WndProc( _
             ' Safety net: WM_MOUSELEAVE is not guaranteed to arrive when the mouse exits
             ' quickly (or onto another control), which would strand the control painted hot.
             if pBtn->hotTimerOn = false then
-                SetTimer( hwnd, IDT_CBUTTON_HOTTRACK, CBUTTON_HOTTRACK_MS, NULL )
+                SetTimer( hwnd, IDT_CBUTTON_HOTTRACK, PSBUTTON_HOTTRACK_MS, NULL )
                 pBtn->hotTimerOn = true
             end if
         end if
@@ -402,20 +402,20 @@ function CButton_WndProc( _
             InvalidateRect( hwnd, NULL, FALSE )
         end if
 
-        if CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
 
     case WM_MOUSELEAVE
         if pBtn then
             ' Fast path for clearing the hot state (the WM_TIMER poll is the fallback for when
             ' this message never arrives). Suppressed during a press for the same reason as in
             ' the timer: the gesture is still live and WM_MOUSEMOVE owns isHot.
-            if pBtn->isPressed = false then CButton_ClearHot( pBtn, hwnd )
-            if CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
+            if pBtn->isPressed = false then PsButton_ClearHot( pBtn, hwnd )
+            if PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
         end if
 
     case WM_LBUTTONDOWN
         if pBtn = 0 then return 0
-        ' A disabled window does not receive mouse input at all (CButton_SetEnabled calls
+        ' A disabled window does not receive mouse input at all (PsButton_SetEnabled calls
         ' EnableWindow), so this is belt-and-braces against a host that disabled us by some
         ' other route.
         if pBtn->isEnabled = false then return 0
@@ -427,7 +427,7 @@ function CButton_WndProc( _
 
         ' Suppressing the press is allowed: no capture has been taken yet, so there is no
         ' bookkeeping to strand.
-        if CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
 
         SetCapture( hwnd )
         pBtn->isPressed = true
@@ -454,12 +454,12 @@ function CButton_WndProc( _
         InvalidateRect( hwnd, NULL, FALSE )
 
         ' The result is deliberately IGNORED here (see BTN_MessageCallbackFunc).
-        CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam )
+        PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam )
 
         ' Only a matched press+release with the cursor still inside is a click. Press, slide
         ' off, release = nothing happened, which is the whole reason for capture.
         dim as boolean bClick = (bWasPressed andalso bInside)
-        if bClick then CButton_FireClick( pBtn, hwnd )
+        if bClick then PsButton_FireClick( pBtn, hwnd )
         return 0
 
     case WM_CAPTURECHANGED
@@ -472,10 +472,10 @@ function CButton_WndProc( _
         end if
 
     case WM_RBUTTONDOWN, WM_RBUTTONUP
-        ' Reported, never acted on: a context menu is the host's business (CPopupMenu). No
+        ' Reported, never acted on: a context menu is the host's business (PsPopupMenu). No
         ' capture is taken for the right button, so an up can arrive without a down.
         if pBtn then
-            if CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
+            if PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
         end if
 
     case WM_SETFOCUS, WM_KILLFOCUS
@@ -488,7 +488,7 @@ function CButton_WndProc( _
                 pBtn->isFocused = bFocused
                 InvalidateRect( hwnd, NULL, FALSE )
             end if
-            CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam )
+            PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam )
             return 0
         end if
 
@@ -514,7 +514,7 @@ function CButton_WndProc( _
     case WM_KEYDOWN
         if pBtn = 0 then exit select
         if pBtn->isEnabled = false then return 0
-        if CButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
+        if PsButton_CallMessage( pBtn, hwnd, uMsg, wParam, lParam ) then return 0
         select case wParam
         case VK_SPACE, VK_RETURN
             ' Same path a completed click takes, so keyboard and mouse cannot drift apart: both
@@ -524,13 +524,13 @@ function CButton_WndProc( _
             ' answers for). isDefault does NOT make this control grab Enter from elsewhere in
             ' the dialog -- it is appearance only, and routing the dialog's default key is the
             ' host's job.
-            CButton_FireClick( pBtn, hwnd )
+            PsButton_FireClick( pBtn, hwnd )
             return 0
         end select
 
     case WM_ENABLE
         ' Keeps our own flag true to the window's real state, so a host that reaches for
-        ' EnableWindow directly instead of CButton_SetEnabled still gets the greyed rendering
+        ' EnableWindow directly instead of PsButton_SetEnabled still gets the greyed rendering
         ' rather than a control that looks live but eats input.
         if pBtn then
             pBtn->isEnabled = (wParam <> 0)
@@ -542,7 +542,7 @@ function CButton_WndProc( _
         end if
 
     case WM_SETTEXT
-        ' The caption has ONE store, reached through two doors: CButton_SetText and this
+        ' The caption has ONE store, reached through two doors: PsButton_SetText and this
         ' message. DefWindowProc is deliberately not called -- letting it keep a second copy in
         ' the window's own text would give GetWindowText an answer that could drift from what
         ' is painted.
@@ -553,7 +553,7 @@ function CButton_WndProc( _
             pBtn->wszText = *cast( wstring ptr, lParam )
         end if
         pBtn->Refresh()
-        CButton_ApplyAutoSize( pBtn )
+        PsButton_ApplyAutoSize( pBtn )
         return TRUE
 
     case WM_GETTEXT
@@ -595,7 +595,7 @@ function CButton_WndProc( _
                 ' Store in an instance-lifetime buffer and point lpszText at it. NOT in
                 ' wszTooltip: that field is the host's authored text, and a callback's answer
                 ' written there would silently become stored state.
-                pBtn->wszTipBuf = CButton_ResolveTooltipText( pBtn )
+                pBtn->wszTipBuf = PsButton_ResolveTooltipText( pBtn )
                 pdi->lpszText = cast( LPWSTR, pBtn->wszTipBuf.vptr )
                 pdi->hinst    = NULL
             end if
@@ -638,9 +638,9 @@ end function
 ' ========================================================================================
 ' Create a tooltip that pulls its text on demand (LPSTR_TEXTCALLBACK) for the whole control.
 ' TTN_GETDISPINFOW therefore goes to TOOLINFO.hwnd, which is the control itself (NOT the parent
-' form), and CButton_WndProc answers it.
+' form), and PsButton_WndProc answers it.
 ' ========================================================================================
-private function CButton_AddTooltip( byval hCtrl as HWND ) as HWND
+private function PsButton_AddTooltip( byval hCtrl as HWND ) as HWND
     if IsWindow(hCtrl) = 0 then return 0
     dim as HWND hTooltip = CreateWindowExW( 0, "tooltips_class32", "", _
                                             WS_POPUP or TTS_ALWAYSTIP, _
@@ -666,9 +666,9 @@ end function
 
 
 ' ========================================================================================
-' CButton_Create
+' PsButton_Create
 ' ========================================================================================
-function CButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
+function PsButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWND
 
     dim pWindow as CWindow ptr = New CWindow
 
@@ -679,19 +679,19 @@ function CButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWN
     ' only dwStyle -- which is what every sibling does -- silently declares itself a CONTAINER.
     ' The dialog manager then descends into it hunting for tabstops, finds no children, and
     ' SKIPS IT: the control becomes unreachable by Tab. (It does not break the rest of the form
-    ' -- that was measured. CButton's demo merely looked completely dead because every control
-    ' on it was a CButton.) Measured, not theorised; see REFACTOR_PLAN.md.
+    ' -- that was measured. PsButton's demo merely looked completely dead because every control
+    ' on it was a PsButton.) Measured, not theorised; see REFACTOR_PLAN.md.
     '
     ' A leaf control must be a tab ITEM, not a tab container. WS_EX_WINDOWEDGE goes with it --
     ' it is a raised-border hint that means nothing to a window drawing its own chrome.
     '
-    ' DO NOT COPY THIS LINE INTO A WRAP-A-REAL-CHILD CONTROL. CListBox, CTextBox and
-    ' CNumericUpDown all NEED WS_EX_CONTROLPARENT, because their tabstop lives on an inner child
+    ' DO NOT COPY THIS LINE INTO A WRAP-A-REAL-CHILD CONTROL. PsListBox, PsTextBox and
+    ' PsNumericUpDown all NEED WS_EX_CONTROLPARENT, because their tabstop lives on an inner child
     ' and their container is a real container; passing 0 there would make them unreachable. The
     ' test is "does this window have children the dialog manager should find?", not "is this a
     ' control?".
     dim as HWND hCtrl = _
-            pWindow->Create( hWndParent, "", @CButton_WndProc, _
+            pWindow->Create( hWndParent, "", @PsButton_WndProc, _
             0, 0, 0, 0, WS_CHILD or WS_TABSTOP or WS_CLIPSIBLINGS or WS_CLIPCHILDREN, _
             0 _
             )
@@ -699,25 +699,25 @@ function CButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HWN
     ' NOTE: CS_DBLCLKS is deliberately NOT enabled here -- see the WndProc header. It would
     ' turn every second rapid click into a WM_LBUTTONDBLCLK the control would drop.
 
-    dim as CBUTTON ptr pBtn = new CBUTTON
+    dim as PSBUTTON ptr pBtn = new PSBUTTON
     pBtn->hWin       = hCtrl
     pBtn->idc_Button = CtrlID
-    pBtn->id         = CtrlID     ' sensible default; CButton_SetID overrides it
+    pBtn->id         = CtrlID     ' sensible default; PsButton_SetID overrides it
 
     ' Only the Create-time defaults are DPI-scaled for us; every setter afterwards takes raw
     ' pixels and the caller scales (the family rule). The two THICKNESS values are not scaled
     ' at all, here or anywhere -- a hairline stays a hairline.
-    pBtn->nPadLeft    = pWindow->ScaleX( CBUTTON_DEFAULT_PADLEFT )
-    pBtn->nPadRight   = pWindow->ScaleX( CBUTTON_DEFAULT_PADRIGHT )
-    pBtn->nPadTop     = pWindow->ScaleY( CBUTTON_DEFAULT_PADTOP )
-    pBtn->nPadBottom  = pWindow->ScaleY( CBUTTON_DEFAULT_PADBOTTOM )
-    pBtn->nIconGap    = pWindow->ScaleX( CBUTTON_DEFAULT_ICONGAP )
-    pBtn->nIconWidth  = pWindow->ScaleX( CBUTTON_DEFAULT_ICONWIDTH )
-    pBtn->nIconHeight = pWindow->ScaleY( CBUTTON_DEFAULT_ICONHEIGHT )
-    pBtn->nCurvature  = pWindow->ScaleY( CBUTTON_DEFAULT_CURVATURE )
-    pBtn->nFocusGap   = pWindow->ScaleY( CBUTTON_DEFAULT_FOCUSGAP )
+    pBtn->nPadLeft    = pWindow->ScaleX( PSBUTTON_DEFAULT_PADLEFT )
+    pBtn->nPadRight   = pWindow->ScaleX( PSBUTTON_DEFAULT_PADRIGHT )
+    pBtn->nPadTop     = pWindow->ScaleY( PSBUTTON_DEFAULT_PADTOP )
+    pBtn->nPadBottom  = pWindow->ScaleY( PSBUTTON_DEFAULT_PADBOTTOM )
+    pBtn->nIconGap    = pWindow->ScaleX( PSBUTTON_DEFAULT_ICONGAP )
+    pBtn->nIconWidth  = pWindow->ScaleX( PSBUTTON_DEFAULT_ICONWIDTH )
+    pBtn->nIconHeight = pWindow->ScaleY( PSBUTTON_DEFAULT_ICONHEIGHT )
+    pBtn->nCurvature  = pWindow->ScaleY( PSBUTTON_DEFAULT_CURVATURE )
+    pBtn->nFocusGap   = pWindow->ScaleY( PSBUTTON_DEFAULT_FOCUSGAP )
 
-    pBtn->hToolTip = CButton_AddTooltip( hCtrl )
+    pBtn->hToolTip = PsButton_AddTooltip( hCtrl )
 
     SetWindowLongPtr( hCtrl, GWLP_ID, CtrlID )
 
@@ -732,71 +732,71 @@ end function
 ' ========================================================================================
 ' Content.  All SILENT -- they change what is drawn, never what was clicked.
 ' ========================================================================================
-function CButton_GetText( byval hButton as HWND ) as DWSTRING
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetText( byval hButton as HWND ) as DWSTRING
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return ""
     dim as DWSTRING wszOut = pBtn->wszText
     return wszOut
 end function
 
-sub CButton_SetText( byval hButton as HWND, byval Text as DWSTRING )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetText( byval hButton as HWND, byval Text as DWSTRING )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->wszText = Text
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetGlyphLeft( byval hButton as HWND ) as DWSTRING
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetGlyphLeft( byval hButton as HWND ) as DWSTRING
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return ""
     dim as DWSTRING wszOut = pBtn->wszGlyphLeft
     return wszOut
 end function
 
-sub CButton_SetGlyphLeft( byval hButton as HWND, byval Glyph as DWSTRING )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetGlyphLeft( byval hButton as HWND, byval Glyph as DWSTRING )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->wszGlyphLeft = Glyph
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetGlyphRight( byval hButton as HWND ) as DWSTRING
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetGlyphRight( byval hButton as HWND ) as DWSTRING
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return ""
     dim as DWSTRING wszOut = pBtn->wszGlyphRight
     return wszOut
 end function
 
-sub CButton_SetGlyphRight( byval hButton as HWND, byval Glyph as DWSTRING )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetGlyphRight( byval hButton as HWND, byval Glyph as DWSTRING )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->wszGlyphRight = Glyph
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetID( byval hButton as HWND ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetID( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->id
 end function
 
-sub CButton_SetID( byval hButton as HWND, byval id as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetID( byval hButton as HWND, byval id as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->id = id
 end sub
 
-function CButton_GetItemData( byval hButton as HWND ) as integer
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetItemData( byval hButton as HWND ) as integer
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->itemData
 end function
 
-sub CButton_SetItemData( byval hButton as HWND, byval itemData as integer )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetItemData( byval hButton as HWND, byval itemData as integer )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->itemData = itemData
 end sub
@@ -805,8 +805,8 @@ end sub
 ' ========================================================================================
 ' State.
 ' ========================================================================================
-function CButton_GetEnabled( byval hButton as HWND ) as boolean
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetEnabled( byval hButton as HWND ) as boolean
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     return pBtn->isEnabled
 end function
@@ -814,21 +814,21 @@ end function
 ' Goes through EnableWindow so the disable is enforced by the SYSTEM rather than being a
 ' cosmetic flag: a disabled window gets no mouse input and the dialog manager's Tab skips it.
 ' WM_ENABLE syncs our own flag and clears hover and any live press.
-sub CButton_SetEnabled( byval hButton as HWND, byval isEnabled as boolean )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetEnabled( byval hButton as HWND, byval isEnabled as boolean )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if pBtn->isEnabled = isEnabled then exit sub
     EnableWindow( hButton, iif( isEnabled, TRUE, FALSE ) )
 end sub
 
-function CButton_GetFocused( byval hButton as HWND ) as boolean
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetFocused( byval hButton as HWND ) as boolean
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     return pBtn->isFocused
 end function
 
-function CButton_GetDefault( byval hButton as HWND ) as boolean
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetDefault( byval hButton as HWND ) as boolean
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     return pBtn->isDefault
 end function
@@ -836,16 +836,16 @@ end function
 ' Appearance only -- it swaps one colour and nothing else, so it never re-measures and the
 ' repaint does not need a background erase. Nothing stops a host marking two buttons default;
 ' the control does not police it.
-sub CButton_SetDefault( byval hButton as HWND, byval isDefault as boolean )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetDefault( byval hButton as HWND, byval isDefault as boolean )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if pBtn->isDefault = isDefault then exit sub
     pBtn->isDefault = isDefault
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, FALSE )
 end sub
 
-sub CButton_Refresh( byval hButton as HWND )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_Refresh( byval hButton as HWND )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->Refresh()
 end sub
@@ -856,18 +856,18 @@ end sub
 ' as a real click would be, and it does not paint a press flash: it reports an action, it does
 ' not animate one.
 ' ========================================================================================
-sub CButton_Click( byval hButton as HWND )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_Click( byval hButton as HWND )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
-    CButton_FireClick( pBtn, hButton )
+    PsButton_FireClick( pBtn, hButton )
 end sub
 
 
 ' ========================================================================================
 ' Layout.  ALL setters take RAW PIXELS -- the caller DPI-scales.
 ' ========================================================================================
-function CButton_GetTextAlign( byval hButton as HWND ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetTextAlign( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return BTN_ALIGN_CENTER
     return pBtn->nTextAlign
 end function
@@ -875,8 +875,8 @@ end function
 ' Alignment moves the caption INSIDE the span, never the span itself, so it cannot change the
 ' ideal size and does not need an auto-size pass. An out-of-range value is ignored rather than
 ' clamped: silently turning a typo into LEFT would hide it.
-sub CButton_SetTextAlign( byval hButton as HWND, byval nTextAlign as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetTextAlign( byval hButton as HWND, byval nTextAlign as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     select case nTextAlign
     case BTN_ALIGN_LEFT, BTN_ALIGN_CENTER, BTN_ALIGN_RIGHT
@@ -886,9 +886,9 @@ sub CButton_SetTextAlign( byval hButton as HWND, byval nTextAlign as long )
     end select
 end sub
 
-sub CButton_GetPadding( byval hButton as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
+sub PsButton_GetPadding( byval hButton as HWND, byref nLeft as long, byref nTop as long, byref nRight as long, byref nBottom as long )
     nLeft = 0 : nTop = 0 : nRight = 0 : nBottom = 0
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     nLeft   = pBtn->nPadLeft
     nTop    = pBtn->nPadTop
@@ -896,8 +896,8 @@ sub CButton_GetPadding( byval hButton as HWND, byref nLeft as long, byref nTop a
     nBottom = pBtn->nPadBottom
 end sub
 
-sub CButton_SetPadding( byval hButton as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetPadding( byval hButton as HWND, byval nLeft as long, byval nTop as long, byval nRight as long, byval nBottom as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nLeft   < 0 then nLeft   = 0
     if nTop    < 0 then nTop    = 0
@@ -908,51 +908,51 @@ sub CButton_SetPadding( byval hButton as HWND, byval nLeft as long, byval nTop a
     pBtn->nPadRight  = nRight
     pBtn->nPadBottom = nBottom
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetIconGap( byval hButton as HWND ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetIconGap( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->nIconGap
 end function
 
-sub CButton_SetIconGap( byval hButton as HWND, byval nIconGap as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetIconGap( byval hButton as HWND, byval nIconGap as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nIconGap < 0 then nIconGap = 0
     pBtn->nIconGap = nIconGap
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-sub CButton_GetIconSize( byval hButton as HWND, byref nIconWidth as long, byref nIconHeight as long )
+sub PsButton_GetIconSize( byval hButton as HWND, byref nIconWidth as long, byref nIconHeight as long )
     nIconWidth = 0 : nIconHeight = 0
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     nIconWidth  = pBtn->nIconWidth
     nIconHeight = pBtn->nIconHeight
 end sub
 
-sub CButton_SetIconSize( byval hButton as HWND, byval nIconWidth as long, byval nIconHeight as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetIconSize( byval hButton as HWND, byval nIconWidth as long, byval nIconHeight as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nIconWidth  < 0 then nIconWidth  = 0
     if nIconHeight < 0 then nIconHeight = 0
     pBtn->nIconWidth  = nIconWidth
     pBtn->nIconHeight = nIconHeight
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetCornerCurvature( byval hButton as HWND ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetCornerCurvature( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->nCurvature
 end function
 
-sub CButton_SetCornerCurvature( byval hButton as HWND, byval nCurvature as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetCornerCurvature( byval hButton as HWND, byval nCurvature as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nCurvature < 0 then nCurvature = 0
     pBtn->nCurvature = nCurvature
@@ -960,25 +960,25 @@ sub CButton_SetCornerCurvature( byval hButton as HWND, byval nCurvature as long 
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, FALSE )
 end sub
 
-function CButton_GetBorderThickness( byval hButton as HWND ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetBorderThickness( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->nBorderThick
 end function
 
 ' The border is drawn INSIDE the chrome rect, so its thickness does not change the ideal size.
 ' It is not DPI-scaled anywhere: a hairline stays a hairline.
-sub CButton_SetBorderThickness( byval hButton as HWND, byval nThickness as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetBorderThickness( byval hButton as HWND, byval nThickness as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nThickness < 0 then nThickness = 0
     pBtn->nBorderThick = nThickness
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, FALSE )
 end sub
 
-sub CButton_GetFocusRing( byval hButton as HWND, byref nGap as long, byref nThickness as long )
+sub PsButton_GetFocusRing( byval hButton as HWND, byref nGap as long, byref nThickness as long )
     nGap = 0 : nThickness = 0
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     nGap       = pBtn->nFocusGap
     nThickness = pBtn->nFocusThick
@@ -986,44 +986,44 @@ end sub
 
 ' The ring band is reserved UNCONDITIONALLY, focused or not, so the button never jumps when
 ' focus arrives -- which is exactly why changing either value changes the IDEAL SIZE.
-sub CButton_SetFocusRing( byval hButton as HWND, byval nGap as long, byval nThickness as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetFocusRing( byval hButton as HWND, byval nGap as long, byval nThickness as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if nGap       < 0 then nGap       = 0
     if nThickness < 0 then nThickness = 0
     pBtn->nFocusGap   = nGap
     pBtn->nFocusThick = nThickness
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetAutoSize( byval hButton as HWND ) as boolean
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetAutoSize( byval hButton as HWND ) as boolean
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     return pBtn->bAutoSize
 end function
 
-sub CButton_SetAutoSize( byval hButton as HWND, byval bAutoSize as boolean )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetAutoSize( byval hButton as HWND, byval bAutoSize as boolean )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->bAutoSize = bAutoSize
     ' Turning it ON applies immediately rather than waiting for the next content change.
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-sub CButton_GetIdealSize( byval hButton as HWND, byref nWidth as long, byref nHeight as long )
+sub PsButton_GetIdealSize( byval hButton as HWND, byref nWidth as long, byref nHeight as long )
     nWidth  = 0
     nHeight = 0
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     nWidth  = pBtn->nIdealW
     nHeight = pBtn->nIdealH
 end sub
 
-function CButton_GetButtonRect( byval hButton as HWND, byref rc as RECT ) as boolean
+function PsButton_GetButtonRect( byval hButton as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return false        ' still no client area
@@ -1031,9 +1031,9 @@ function CButton_GetButtonRect( byval hButton as HWND, byref rc as RECT ) as boo
     return true
 end function
 
-function CButton_GetTextRect( byval hButton as HWND, byref rc as RECT ) as boolean
+function PsButton_GetTextRect( byval hButton as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return false
@@ -1041,9 +1041,9 @@ function CButton_GetTextRect( byval hButton as HWND, byref rc as RECT ) as boole
     return true
 end function
 
-function CButton_GetIconLeftRect( byval hButton as HWND, byref rc as RECT ) as boolean
+function PsButton_GetIconLeftRect( byval hButton as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return false
@@ -1051,9 +1051,9 @@ function CButton_GetIconLeftRect( byval hButton as HWND, byref rc as RECT ) as b
     return true
 end function
 
-function CButton_GetIconRightRect( byval hButton as HWND, byref rc as RECT ) as boolean
+function PsButton_GetIconRightRect( byval hButton as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return false
@@ -1061,9 +1061,9 @@ function CButton_GetIconRightRect( byval hButton as HWND, byref rc as RECT ) as 
     return true
 end function
 
-function CButton_GetVisualRect( byval hButton as HWND, byref rc as RECT ) as boolean
+function PsButton_GetVisualRect( byval hButton as HWND, byref rc as RECT ) as boolean
     SetRectEmpty( @rc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return false
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return false
@@ -1075,48 +1075,48 @@ end function
 ' ========================================================================================
 ' Appearance.  Both fonts are BORROWED, never owned.
 ' ========================================================================================
-sub CButton_GetColors( byval hButton as HWND, byval pColors as CBUTTON_COLORS ptr )
+sub PsButton_GetColors( byval hButton as HWND, byval pColors as PSBUTTON_COLORS ptr )
     if pColors = 0 then exit sub
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     *pColors = pBtn->colors
 end sub
 
-sub CButton_SetColors( byval hButton as HWND, byval pColors as CBUTTON_COLORS ptr )
+sub PsButton_SetColors( byval hButton as HWND, byval pColors as PSBUTTON_COLORS ptr )
     if pColors = 0 then exit sub
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->colors = *pColors
     ' Colours only -- nothing measured changes, so no layout and no auto-size.
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, FALSE )
 end sub
 
-function CButton_GetFont( byval hButton as HWND ) as HFONT
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetFont( byval hButton as HWND ) as HFONT
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->hTextFont
 end function
 
 ' The CAPTION font, and therefore the MEASURING font: changing it re-measures and can change
 ' the ideal size.
-sub CButton_SetFont( byval hButton as HWND, byval hTextFont as HFONT )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetFont( byval hButton as HWND, byval hTextFont as HFONT )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->hTextFont = hTextFont
     pBtn->Refresh()
-    CButton_ApplyAutoSize( pBtn )
+    PsButton_ApplyAutoSize( pBtn )
 end sub
 
-function CButton_GetGlyphFont( byval hButton as HWND ) as HFONT
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetGlyphFont( byval hButton as HWND ) as HFONT
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->hGlyphFont
 end function
 
-' The ICON font. A PAINT-TIME INPUT ONLY: the icon cell is declared by CButton_SetIconSize and
+' The ICON font. A PAINT-TIME INPUT ONLY: the icon cell is declared by PsButton_SetIconSize and
 ' is never measured, so changing this repaints but never re-lays-out and never resizes.
-sub CButton_SetGlyphFont( byval hButton as HWND, byval hGlyphFont as HFONT )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetGlyphFont( byval hButton as HWND, byval hGlyphFont as HFONT )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->hGlyphFont = hGlyphFont
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, FALSE )
@@ -1126,27 +1126,27 @@ end sub
 ' ========================================================================================
 ' Tooltips.
 ' ========================================================================================
-function CButton_GetTooltipText( byval hButton as HWND ) as DWSTRING
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetTooltipText( byval hButton as HWND ) as DWSTRING
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return ""
     dim as DWSTRING wszOut = pBtn->wszTooltip
     return wszOut
 end function
 
-sub CButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->wszTooltip = Text
 end sub
 
-function CButton_GetTooltipHandle( byval hButton as HWND ) as HWND
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_GetTooltipHandle( byval hButton as HWND ) as HWND
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return pBtn->hToolTip
 end function
 
-sub CButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->HoverTime = milliseconds
     if pBtn->hToolTip then
@@ -1158,27 +1158,27 @@ end sub
 ' ========================================================================================
 ' Callbacks.
 ' ========================================================================================
-sub CButton_SetPaintCallback( byval hButton as HWND, byval usersub as BTN_PaintCallbackSub )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetPaintCallback( byval hButton as HWND, byval usersub as BTN_PaintCallbackSub )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->PaintCallback = usersub
     if pBtn->hWin then InvalidateRect( pBtn->hWin, NULL, TRUE )
 end sub
 
-sub CButton_SetMessageCallback( byval hButton as HWND, byval userfunc as BTN_MessageCallbackFunc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetMessageCallback( byval hButton as HWND, byval userfunc as BTN_MessageCallbackFunc )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->MessageCallback = userfunc
 end sub
 
-sub CButton_SetTooltipCallback( byval hButton as HWND, byval userfunc as BTN_TooltipCallbackFunc )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetTooltipCallback( byval hButton as HWND, byval userfunc as BTN_TooltipCallbackFunc )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->TooltipCallback = userfunc
 end sub
 
-sub CButton_SetClickCallback( byval hButton as HWND, byval usersub as BTN_ClickCallbackSub )
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+sub PsButton_SetClickCallback( byval hButton as HWND, byval usersub as BTN_ClickCallbackSub )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
     pBtn->ClickCallback = usersub
 end sub
@@ -1188,7 +1188,7 @@ end sub
 ' Which rect does this part name? Shared by the tone probe and nothing else, but factored out
 ' so the probe body stays about pixels rather than about rect selection.
 ' ========================================================================================
-private function CButton_PartRect( byval pBtn as CBUTTON ptr, byval nPart as long ) as RECT
+private function PsButton_PartRect( byval pBtn as PSBUTTON ptr, byval nPart as long ) as RECT
     dim as RECT rc
     SetRectEmpty( @rc )
     if pBtn = 0 then return rc
@@ -1208,11 +1208,11 @@ end function
 
 ' ========================================================================================
 ' Render the control OFFSCREEN with its current painter and count the distinct colours inside
-' one of its rects. See the header in CButton.bi for what this is for and why it is public.
+' one of its rects. See the header in PsButton.bi for what this is for and why it is public.
 '
 ' THREE THINGS HERE ARE LOAD-BEARING, and all three come from the write-up in Learnings.md:
 '
-'   1. The PAINTINFO is filled by CButton_FillPaintInfo -- the SAME routine WM_PAINT uses. The
+'   1. The PAINTINFO is filled by PsButton_FillPaintInfo -- the SAME routine WM_PAINT uses. The
 '      first version of this probe elsewhere in the family hand-built the struct and left
 '      rcVisual zeroed; PaintRectFactory bails on a negative extent, so the focus-ring call
 '      became a no-op and the A/B came back identical. A probe that skips the code path it
@@ -1224,8 +1224,8 @@ end function
 '      batches: reading the bits before that flush would sample a surface the shapes have not
 '      reached yet.
 ' ========================================================================================
-function CButton_CountRenderedTones( byval hButton as HWND, byval nPart as long ) as long
-    dim as CBUTTON ptr pBtn = GetButtonPointer(hButton)
+function PsButton_CountRenderedTones( byval hButton as HWND, byval nPart as long ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     if pBtn->bLayoutDirty then pBtn->LayoutButton()
     if pBtn->bLayoutDirty then return 0          ' no client area yet
@@ -1236,7 +1236,7 @@ function CButton_CountRenderedTones( byval hButton as HWND, byval nPart as long 
     dim as long ch = rcClient.bottom - rcClient.top
     if (cw <= 0) orelse (ch <= 0) then return 0
 
-    dim as RECT rcPart = CButton_PartRect( pBtn, nPart )
+    dim as RECT rcPart = PsButton_PartRect( pBtn, nPart )
     if IsRectEmpty( @rcPart ) then return 0
 
     ' Clamp to the client: rcVisual can legitimately extend past it when the host sized the
@@ -1255,7 +1255,7 @@ function CButton_CountRenderedTones( byval hButton as HWND, byval nPart as long 
         return 0
     end if
 
-    ' 32bpp top-down, matching what CBufferPaint.SetupBitmap builds, so the pixels we read are
+    ' 32bpp top-down, matching what PsBufferPaint.SetupBitmap builds, so the pixels we read are
     ' laid out the way the renderer wrote them.
     dim as BITMAPINFO bmi
     with bmi.bmiHeader
@@ -1280,25 +1280,25 @@ function CButton_CountRenderedTones( byval hButton as HWND, byval nPart as long 
     pBtn->isFocused = true
 
     scope
-        dim as CBufferPaint b
+        dim as PsBufferPaint b
         ' Four-arg form: hMem is BOTH the blit target and the cached back buffer, so the final
         ' BitBlt is a self-copy and the bitmap survives EndDoubleBuffer for us to read.
         b.BeginDoubleBuffer( hButton, hMem, rcClient, hMem )
 
-        dim as long nMood = CButton_ResolveMood( pBtn->isEnabled, pBtn->isPressed, pBtn->isHot )
+        dim as long nMood = PsButton_ResolveMood( pBtn->isEnabled, pBtn->isPressed, pBtn->isHot )
         dim as COLORREF clrFill, clrFore, clrBorder, clrIcon
-        CButton_ResolveColors( @pBtn->colors, nMood, pBtn->isDefault, _
+        PsButton_ResolveColors( @pBtn->colors, nMood, pBtn->isDefault, _
                                clrFill, clrFore, clrBorder, clrIcon )
         b.SetBackColor( clrFill )
         b.PaintClientRect()
 
-        dim p as CBUTTON_PAINTINFO
-        CButton_FillPaintInfo( pBtn, hButton, @b, @p )
+        dim p as PSBUTTON_PAINTINFO
+        PsButton_FillPaintInfo( pBtn, hButton, @b, @p )
 
         if pBtn->PaintCallback then
             pBtn->PaintCallback( @p )
         else
-            CButton_RenderDefault( pBtn, @b, @p )
+            PsButton_RenderDefault( pBtn, @b, @p )
         end if
 
         b.EndDoubleBuffer()
@@ -1336,7 +1336,7 @@ end function
 
 
 ' ========================================================================================
-' Self-test.  Gated on CBUTTON_SELFTEST=1.
+' Self-test.  Gated on PSBUTTON_SELFTEST=1.
 ' ========================================================================================
 dim shared as long gBTN_TestCount
 dim shared as long gBTN_FailCount
@@ -1359,20 +1359,20 @@ private function BTNTest_RectStr( byref rc as RECT ) as string
 end function
 
 
-sub CButton_RunSelfTest( byval hWndParent as HWND )
-    if environ("CBUTTON_SELFTEST") <> "1" then exit sub
+sub PsButton_RunSelfTest( byval hWndParent as HWND )
+    if environ("PSBUTTON_SELFTEST") <> "1" then exit sub
 
     gBTN_TestCount = 0
     gBTN_FailCount = 0
-    print "=== CButton self-test ==="
+    print "=== PsButton self-test ==="
 
-    dim as HWND h = CButton_Create( hWndParent, 9801 )
+    dim as HWND h = PsButton_Create( hWndParent, 9801 )
     if h = 0 then
-        print "FAIL  create   [CButton_Create returned 0]"
+        print "FAIL  create   [PsButton_Create returned 0]"
         exit sub
     end if
 
-    dim as CBUTTON ptr pB = GetButtonPointer(h)
+    dim as PSBUTTON ptr pB = GetButtonPointer(h)
     if pB = 0 then
         print "FAIL  pointer   [GetButtonPointer returned 0]"
         DestroyWindow(h)
@@ -1388,12 +1388,12 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     ' Pin every layout input to a known value so the arithmetic below is exact rather than
     ' DPI-dependent. Only the CAPTION stays measured, and every assertion that involves it is
     ' written against pB->nTextWidth rather than against a literal.
-    CButton_SetPadding( h, 10, 5, 10, 5 )
-    CButton_SetIconGap( h, 8 )
-    CButton_SetIconSize( h, 16, 16 )
-    CButton_SetFocusRing( h, 2, 1 )              ' ringPad = 3
-    CButton_SetBorderThickness( h, 1 )
-    CButton_SetCornerCurvature( h, 8 )
+    PsButton_SetPadding( h, 10, 5, 10, 5 )
+    PsButton_SetIconGap( h, 8 )
+    PsButton_SetIconSize( h, 16, 16 )
+    PsButton_SetFocusRing( h, 2, 1 )              ' ringPad = 3
+    PsButton_SetBorderThickness( h, 1 )
+    PsButton_SetCornerCurvature( h, 8 )
 
     ' Plain letters, not Segoe Fluent Icons codepoints: the control does not care what the
     ' glyph string is, and a letter renders under the stock GUI font, so the tone probe at the
@@ -1405,8 +1405,8 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     dim as long ringPad = pB->RingPad()
 
     ' ---- 1. ideal size is valid BEFORE the control has ever been sized ------------------
-    CButton_SetText( h, CAPTION )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetText( h, CAPTION )
+    PsButton_GetIdealSize( h, w, hh )
     sD = "w=" & str(w) & " h=" & str(hh)
     BTNTest_Check( "ideal size before first size", (w > 0) andalso (hh > 0), sD )
 
@@ -1421,23 +1421,23 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     BTNTest_Check( "ideal height = ring+padT+textH+padB", (hh = expectH), sD )
 
     ' ---- 3. a left glyph costs exactly one cell plus one gap ----------------------------
-    CButton_SetGlyphLeft( h, GLYPH_L )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetGlyphLeft( h, GLYPH_L )
+    PsButton_GetIdealSize( h, w, hh )
     sD = "before=" & str(textOnlyW) & " after=" & str(w) & " delta=" & str(w - textOnlyW)
     BTNTest_Check( "left glyph adds iconW + gap", (w - textOnlyW) = (16 + 8), sD )
     dim as long leftOnlyW = w
 
     ' ---- 4. a right glyph costs the same again ------------------------------------------
-    CButton_SetGlyphRight( h, GLYPH_R )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetGlyphRight( h, GLYPH_R )
+    PsButton_GetIdealSize( h, w, hh )
     sD = "before=" & str(leftOnlyW) & " after=" & str(w) & " delta=" & str(w - leftOnlyW)
     BTNTest_Check( "right glyph adds iconW + gap", (w - leftOnlyW) = (16 + 8), sD )
     dim as long bothW = w
 
     ' ---- 5. THE GAP IS SPENT ONLY WHEN THERE IS A CAPTION -------------------------------
     ' Direction 1: drop the caption and both gaps must go with it, not just the text width.
-    CButton_SetText( h, "" )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetText( h, "" )
+    PsButton_GetIdealSize( h, w, hh )
     dim as long expectIconOnly = (2 * ringPad) + 10 + 16 + 16 + 10
     sD = "ideal=" & str(w) & " expect=" & str(expectIconOnly) & " (no gaps charged)"
     BTNTest_Check( "no caption = no gap on either side", (w = expectIconOnly), sD )
@@ -1448,8 +1448,8 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     BTNTest_Check( "no caption = height comes from the icon", (hh = expectIconH), sD )
 
     ' Direction 2: put it back and both gaps return with it.
-    CButton_SetText( h, CAPTION )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetText( h, CAPTION )
+    PsButton_GetIdealSize( h, w, hh )
     sD = "restored=" & str(w) & " expect=" & str(bothW)
     BTNTest_Check( "caption restored = gaps restored", (w = bothW), sD )
 
@@ -1457,23 +1457,23 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     ' Size the control to ideal first; every rect query below needs a client area.
     SetWindowPos( h, 0, 0, 0, bothW, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
-    CButton_SetGlyphRight( h, "" )
-    CButton_GetIconRightRect( h, rcIR )
+    PsButton_SetGlyphRight( h, "" )
+    PsButton_GetIconRightRect( h, rcIR )
     sD = "rcIconRight=" & BTNTest_RectStr( rcIR )
     BTNTest_Check( "no right glyph = empty rect", IsRectEmpty( @rcIR ) <> 0, sD )
-    CButton_SetGlyphRight( h, GLYPH_R )
+    PsButton_SetGlyphRight( h, GLYPH_R )
 
-    CButton_SetText( h, "" )
-    CButton_GetTextRect( h, rcTxt )
+    PsButton_SetText( h, "" )
+    PsButton_GetTextRect( h, rcTxt )
     sD = "rcText=" & BTNTest_RectStr( rcTxt )
     BTNTest_Check( "no caption = empty text rect", IsRectEmpty( @rcTxt ) <> 0, sD )
-    CButton_SetText( h, CAPTION )
+    PsButton_SetText( h, CAPTION )
 
     ' ---- 7. the icons are PINNED to the padding ----------------------------------------
     SetWindowPos( h, 0, 0, 0, bothW, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CButton_GetButtonRect( h, rcBtn )
-    CButton_GetIconLeftRect( h, rcIL )
-    CButton_GetIconRightRect( h, rcIR )
+    PsButton_GetButtonRect( h, rcBtn )
+    PsButton_GetIconLeftRect( h, rcIL )
+    PsButton_GetIconRightRect( h, rcIR )
     sD = "btn=" & BTNTest_RectStr( rcBtn ) & " iconL=" & BTNTest_RectStr( rcIL )
     BTNTest_Check( "left icon pinned at padLeft", (rcIL.left - rcBtn.left) = 10, sD )
     sD = "btn=" & BTNTest_RectStr( rcBtn ) & " iconR=" & BTNTest_RectStr( rcIR )
@@ -1484,22 +1484,22 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
 
     ' ...and a much longer caption does not move them (the control is re-sized to the new
     ' ideal, which is what a host would do).
-    CButton_SetText( h, "A Very Much Longer Caption Indeed" )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetText( h, "A Very Much Longer Caption Indeed" )
+    PsButton_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CButton_GetButtonRect( h, rcBtn )
-    CButton_GetIconLeftRect( h, rcIL )
-    CButton_GetIconRightRect( h, rcIR )
+    PsButton_GetButtonRect( h, rcBtn )
+    PsButton_GetIconLeftRect( h, rcIL )
+    PsButton_GetIconRightRect( h, rcIR )
     sD = "padL=" & str(rcIL.left - rcBtn.left) & " padR=" & str(rcBtn.right - rcIR.right)
     BTNTest_Check( "caption length never moves the icons", _
                    ((rcIL.left - rcBtn.left) = 10) andalso ((rcBtn.right - rcIR.right) = 10), sD )
-    CButton_SetText( h, CAPTION )
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_SetText( h, CAPTION )
+    PsButton_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
     ' ---- 8. the caption SPAN sits exactly between the two icon blocks -------------------
-    CButton_GetButtonRect( h, rcBtn )
-    CButton_GetTextRect( h, rcTxt )
+    PsButton_GetButtonRect( h, rcBtn )
+    PsButton_GetTextRect( h, rcTxt )
     sD = "text=" & BTNTest_RectStr( rcTxt ) & " btn=" & BTNTest_RectStr( rcBtn )
     BTNTest_Check( "span starts after padLeft + leftBlock", _
                    (rcTxt.left - rcBtn.left) = (10 + 16 + 8), sD )
@@ -1515,7 +1515,7 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
                    (rcTxt.top - rcBtn.top) = ((btnH - pB->nTextHeight) \ 2), sD )
 
     ' ---- 10. the focus-ring band is reserved, and is the whole difference ---------------
-    CButton_GetVisualRect( h, rcVis )
+    PsButton_GetVisualRect( h, rcVis )
     sD = "visual=" & BTNTest_RectStr( rcVis ) & " btn=" & BTNTest_RectStr( rcBtn ) & _
          " ringPad=" & str(ringPad)
     BTNTest_Check( "visual = chrome inflated by ringPad", _
@@ -1532,8 +1532,8 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     dim as boolean bSavedFocus = pB->isFocused
     pB->isFocused = true
     pB->bLayoutDirty = true
-    CButton_GetButtonRect( h, rcBtn )
-    CButton_GetTextRect( h, rcTxt )
+    PsButton_GetButtonRect( h, rcBtn )
+    PsButton_GetTextRect( h, rcTxt )
     pB->isFocused = bSavedFocus
     sD = "unfocused=" & BTNTest_RectStr( rcBtnUnfocused ) & " focused=" & BTNTest_RectStr( rcBtn )
     BTNTest_Check( "focus does not move anything", _
@@ -1543,10 +1543,10 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     ' ---- 11. overflow is honest: the span collapses, the icons do not -------------------
     dim as long narrow = 2 * ringPad + 10 + 16 + 16 + 10        ' exactly no room for a caption
     SetWindowPos( h, 0, 0, 0, narrow, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
-    CButton_GetButtonRect( h, rcBtn )
-    CButton_GetTextRect( h, rcTxt )
-    CButton_GetIconLeftRect( h, rcIL )
-    CButton_GetIconRightRect( h, rcIR )
+    PsButton_GetButtonRect( h, rcBtn )
+    PsButton_GetTextRect( h, rcTxt )
+    PsButton_GetIconLeftRect( h, rcIL )
+    PsButton_GetIconRightRect( h, rcIR )
     sD = "text=" & BTNTest_RectStr( rcTxt ) & " width=" & str(rcTxt.right - rcTxt.left)
     BTNTest_Check( "too narrow: span degenerates, never goes negative", _
                    (rcTxt.right >= rcTxt.left) andalso ((rcTxt.right - rcTxt.left) = 0), sD )
@@ -1559,7 +1559,7 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     ' never see one -- and that is only true if starving the control leaves the measurement
     ' alone.
     dim as long w2, h2
-    CButton_GetIdealSize( h, w2, h2 )
+    PsButton_GetIdealSize( h, w2, h2 )
     sD = "ideal now=" & str(w2) & "x" & str(h2) & " expect=" & str(bothW) & "x" & str(hh)
     BTNTest_Check( "ideal size unaffected by a starved client", _
                    (w2 = bothW) andalso (h2 = hh), sD )
@@ -1569,25 +1569,25 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     ' disabled > pressed > hot > idle. All eight combinations, because the interesting ones are
     ' the contradictory states (disabled AND pressed) that only a race can produce.
     BTNTest_Check( "mood: enabled,idle", _
-                   CButton_ResolveMood( true, false, false ) = BTN_MOOD_IDLE, "" )
+                   PsButton_ResolveMood( true, false, false ) = BTN_MOOD_IDLE, "" )
     BTNTest_Check( "mood: enabled,hot", _
-                   CButton_ResolveMood( true, false, true ) = BTN_MOOD_HOT, "" )
+                   PsButton_ResolveMood( true, false, true ) = BTN_MOOD_HOT, "" )
     BTNTest_Check( "mood: enabled,pressed", _
-                   CButton_ResolveMood( true, true, false ) = BTN_MOOD_PRESSED, "" )
+                   PsButton_ResolveMood( true, true, false ) = BTN_MOOD_PRESSED, "" )
     BTNTest_Check( "mood: pressed beats hot", _
-                   CButton_ResolveMood( true, true, true ) = BTN_MOOD_PRESSED, "" )
+                   PsButton_ResolveMood( true, true, true ) = BTN_MOOD_PRESSED, "" )
     BTNTest_Check( "mood: disabled,idle", _
-                   CButton_ResolveMood( false, false, false ) = BTN_MOOD_DISABLED, "" )
+                   PsButton_ResolveMood( false, false, false ) = BTN_MOOD_DISABLED, "" )
     BTNTest_Check( "mood: disabled beats hot", _
-                   CButton_ResolveMood( false, false, true ) = BTN_MOOD_DISABLED, "" )
+                   PsButton_ResolveMood( false, false, true ) = BTN_MOOD_DISABLED, "" )
     BTNTest_Check( "mood: disabled beats pressed", _
-                   CButton_ResolveMood( false, true, false ) = BTN_MOOD_DISABLED, "" )
+                   PsButton_ResolveMood( false, true, false ) = BTN_MOOD_DISABLED, "" )
     BTNTest_Check( "mood: disabled beats both", _
-                   CButton_ResolveMood( false, true, true ) = BTN_MOOD_DISABLED, "" )
+                   PsButton_ResolveMood( false, true, true ) = BTN_MOOD_DISABLED, "" )
 
     ' ---- 14. isDefault overlays the border in EVERY mood --------------------------------
-    dim as CBUTTON_COLORS c
-    CButton_GetColors( h, @c )
+    dim as PSBUTTON_COLORS c
+    PsButton_GetColors( h, @c )
     ' Make every field distinguishable, so an assertion cannot pass by two colours happening
     ' to be equal (which they ARE by default -- the borderless look).
     c.BorderColor         = BGR(1,1,1)
@@ -1595,20 +1595,20 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     c.BorderColorPressed  = BGR(3,3,3)
     c.BorderColorDisabled = BGR(4,4,4)
     c.DefaultBorderColor  = BGR(9,9,9)
-    CButton_SetColors( h, @c )
+    PsButton_SetColors( h, @c )
 
     dim as COLORREF cBack, cFore, cBorder, cIcon
     dim as long nMoods(0 to 3) = { BTN_MOOD_IDLE, BTN_MOOD_HOT, BTN_MOOD_PRESSED, BTN_MOOD_DISABLED }
     dim as COLORREF cExpect(0 to 3) = { BGR(1,1,1), BGR(2,2,2), BGR(3,3,3), BGR(4,4,4) }
 
     for i as long = 0 to 3
-        CButton_ResolveColors( @c, nMoods(i), false, cBack, cFore, cBorder, cIcon )
+        PsButton_ResolveColors( @c, nMoods(i), false, cBack, cFore, cBorder, cIcon )
         sD = "mood=" & str(nMoods(i)) & " border=" & hex(cBorder) & " expect=" & hex(cExpect(i))
         BTNTest_Check( "border follows the mood when not default", (cBorder = cExpect(i)), sD )
 
         ' The same mood, with the flag on: only the border may move.
         dim as COLORREF dBack, dFore, dBorder, dIcon
-        CButton_ResolveColors( @c, nMoods(i), true, dBack, dFore, dBorder, dIcon )
+        PsButton_ResolveColors( @c, nMoods(i), true, dBack, dFore, dBorder, dIcon )
         sD = "mood=" & str(nMoods(i)) & " border=" & hex(dBorder) & " expect=" & hex(c.DefaultBorderColor)
         BTNTest_Check( "isDefault overlays the border in this mood", _
                        (dBorder = c.DefaultBorderColor), sD )
@@ -1618,13 +1618,13 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     next
 
     ' Put the defaults back before the render probe, so it measures the shipping look.
-    dim as CBUTTON_COLORS cFresh
-    CButton_SetColors( h, @cFresh )
+    dim as PSBUTTON_COLORS cFresh
+    PsButton_SetColors( h, @cFresh )
 
     ' ---- 15. the window text really is the caption --------------------------------------
     ' ASK THE CONTROL. Reading the field back would assert nothing about the message handlers,
     ' which are the whole point of this section -- a SendMessage whose result is discarded is
-    ' an assumption, not an implementation (the CNumericUpDown lesson).
+    ' an assumption, not an implementation (the PsNumericUpDown lesson).
     dim as wstring * 64 wszSet = "Window Text Test"
     SendMessageW( h, WM_SETTEXT, 0, cast( LPARAM, @wszSet ) )
 
@@ -1650,18 +1650,18 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     dim as wstring * 64 wszWin
     GetWindowTextW( h, @wszWin, 64 )
     dim as wstring * 64 wszApi
-    wszApi = CButton_GetText( h )
-    sD = "GetWindowText=[" & str(wszWin) & "] CButton_GetText=[" & str(wszApi) & "]"
-    BTNTest_Check( "GetWindowText agrees with CButton_GetText", (wszWin = wszApi), sD )
+    wszApi = PsButton_GetText( h )
+    sD = "GetWindowText=[" & str(wszWin) & "] PsButton_GetText=[" & str(wszApi) & "]"
+    BTNTest_Check( "GetWindowText agrees with PsButton_GetText", (wszWin = wszApi), sD )
 
     ' SetWindowText must go the other way and re-measure.
     dim as long wBefore = 0, hBefore = 0
-    CButton_GetIdealSize( h, wBefore, hBefore )
+    PsButton_GetIdealSize( h, wBefore, hBefore )
     SetWindowTextW( h, "Substantially Longer Window Text" )
-    CButton_GetIdealSize( h, w2, h2 )
+    PsButton_GetIdealSize( h, w2, h2 )
     sD = "before=" & str(wBefore) & " after=" & str(w2)
     BTNTest_Check( "SetWindowText re-measures the button", (w2 > wBefore), sD )
-    CButton_SetText( h, CAPTION )
+    PsButton_SetText( h, CAPTION )
 
     ' ---- 16. the control is a tab ITEM, not a tab CONTAINER -----------------------------
     ' CWindow.Create defaults dwExStyle to WS_EX_CONTROLPARENT OR WS_EX_WINDOWEDGE, so a
@@ -1702,26 +1702,26 @@ sub CButton_RunSelfTest( byval hWndParent as HWND )
     BTNTest_Check( "the dialog manager can reach us by Tab", bReachable, sD )
 
     ' ---- 17. the render probe: the control is not a solid block -------------------------
-    ' See CButton_CountRenderedTones. A part wiped by a PaintBorderRect fill is literally ONE
+    ' See PsButton_CountRenderedTones. A part wiped by a PaintBorderRect fill is literally ONE
     ' tone, so the useful signal is the count LEAVING 1 -- not the count being large.
-    CButton_GetIdealSize( h, w, hh )
+    PsButton_GetIdealSize( h, w, hh )
     SetWindowPos( h, 0, 0, 0, w, hh, SWP_NOZORDER or SWP_NOMOVE or SWP_NOACTIVATE )
 
-    dim as long tButton = CButton_CountRenderedTones( h, BTN_PART_BUTTON )
+    dim as long tButton = PsButton_CountRenderedTones( h, BTN_PART_BUTTON )
     sD = "distinct tones in the chrome=" & str(tButton)
     BTNTest_Check( "built-in painter does not flood the button", (tButton > 1), sD )
 
-    dim as long tText = CButton_CountRenderedTones( h, BTN_PART_TEXT )
+    dim as long tText = PsButton_CountRenderedTones( h, BTN_PART_TEXT )
     sD = "distinct tones in the caption span=" & str(tText)
     BTNTest_Check( "the caption actually reached the surface", (tText > 1), sD )
 
-    dim as long tIcon = CButton_CountRenderedTones( h, BTN_PART_ICONLEFT )
+    dim as long tIcon = PsButton_CountRenderedTones( h, BTN_PART_ICONLEFT )
     sD = "distinct tones in the left icon cell=" & str(tIcon)
     BTNTest_Check( "the left glyph actually reached the surface", (tIcon > 1), sD )
 
     DestroyWindow(h)
 
-    dim as string sSummary = "=== CButton: " & str(gBTN_TestCount - gBTN_FailCount) & _
+    dim as string sSummary = "=== PsButton: " & str(gBTN_TestCount - gBTN_FailCount) & _
                              "/" & str(gBTN_TestCount) & " assertions passed"
     if gBTN_FailCount > 0 then sSummary &= "  (" & str(gBTN_FailCount) & " FAILED)"
     print sSummary

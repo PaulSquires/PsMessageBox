@@ -1,4 +1,4 @@
-'    CMessageBox - reusable owner-drawn modal message box control
+'    PsMessageBox - reusable owner-drawn modal message box control
 '    Copyright (C) 2016-2026 Paul Squires, PlanetSquires Software
 '
 '    This program is free software: you can redistribute it and/or modify
@@ -13,7 +13,7 @@
 
 #pragma once
 
-' The demo is a list of rows, each a CButton that raises one message box. The row's small print
+' The demo is a list of rows, each a PsButton that raises one message box. The row's small print
 ' reports what the LAST call returned, which is the only way to see the difference between
 ' clicking Cancel and pressing Esc -- they answer the same id on purpose.
 '
@@ -27,7 +27,7 @@
 '    7  Focus and default on DIFFERENT rows -- Delete is default, Cancel is focused
 '    8  A custom PAINT CALLBACK             -- replaces the built-in painter wholesale
 '    9  NESTED: click the BODY of the box   -- raises a second modal loop on top of the first
-'   10  CMessageBox_Show one-liner          -- no fonts set, so the glyph is honestly missing
+'   10  PsMessageBox_Show one-liner          -- no fonts set, so the glyph is honestly missing
 #define DEMO_ROW_COUNT   11
 
 #define IDC_FRMMAIN_BTN_FIRST      1000

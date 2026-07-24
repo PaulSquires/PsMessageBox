@@ -1,5 +1,5 @@
 #include once "frmMain.bi"
-#include once "CBufferPaint.bi"
+#include once "PsBufferPaint.bi"
 
 
 ' One demo row: the label the form draws, the small print under it, and the last result.
@@ -52,12 +52,12 @@ end function
 
 ' ========================================================================================
 ' The LIGHT colour set, matched to the reference screenshot. The control's own defaults are
-' DARK (inherited from CBUTTON_COLORS), so this is what a host does to go the other way -- and
+' DARK (inherited from PSBUTTON_COLORS), so this is what a host does to go the other way -- and
 ' it is the only place in this repo where the screenshot's exact palette lives.
 ' ========================================================================================
 private sub ApplyLightTheme( byval hBox as HWND )
     dim c as MBX_COLORS
-    CMessageBox_GetColors( hBox, @c )
+    PsMessageBox_GetColors( hBox, @c )
 
     c.BorderColor           = BGR(200,200,200)
     c.CaptionBackColor      = BGR(243,243,243)
@@ -73,10 +73,10 @@ private sub ApplyLightTheme( byval hBox as HWND )
     c.FooterBackColor       = BGR(240,240,240)
     c.DividerColor          = BGR(224,224,224)
     c.IconColorWarning      = BGR(247,182, 21)
-    CMessageBox_SetColors( hBox, @c )
+    PsMessageBox_SetColors( hBox, @c )
 
     ' The buttons have to move with it, or a light box gets the family's dark buttons.
-    dim b as CBUTTON_COLORS
+    dim b as PSBUTTON_COLORS
     b.BackColor           = BGR(251,251,251)
     b.ForeColor           = BGR( 26, 26, 26)
     b.BorderColor         = BGR(209,209,209)
@@ -95,7 +95,7 @@ private sub ApplyLightTheme( byval hBox as HWND )
     b.IconColorDisabled   = BGR(160,160,160)
     b.FocusRingColor      = BGR( 26,111,204)
     b.DefaultBorderColor  = BGR( 26,111,204)
-    CMessageBox_SetButtonColors( hBox, @b )
+    PsMessageBox_SetButtonColors( hBox, @b )
 end sub
 
 
@@ -105,13 +105,13 @@ end sub
 ' skips this to show what that looks like.
 '
 ' NOTE THE TWO GLYPH FONTS. The message icon sits in a 32px cell and the close X is caption
-' chrome, so one size cannot serve both; see CMessageBox_SetCloseGlyphFont.
+' chrome, so one size cannot serve both; see PsMessageBox_SetCloseGlyphFont.
 ' ========================================================================================
 private sub ApplyDemoFonts( byval hBox as HWND )
-    CMessageBox_SetFont( hBox, ghFont(GUIFONT_10) )
-    CMessageBox_SetCaptionFont( hBox, ghFont(GUIFONT_10) )
-    CMessageBox_SetGlyphFont( hBox, ghFont(SYMBOLFONT_20) )
-    CMessageBox_SetCloseGlyphFont( hBox, ghFont(SYMBOLFONT_10) )
+    PsMessageBox_SetFont( hBox, ghFont(GUIFONT_10) )
+    PsMessageBox_SetCaptionFont( hBox, ghFont(GUIFONT_10) )
+    PsMessageBox_SetGlyphFont( hBox, ghFont(SYMBOLFONT_20) )
+    PsMessageBox_SetCloseGlyphFont( hBox, ghFont(SYMBOLFONT_10) )
 end sub
 
 
@@ -121,13 +121,13 @@ end sub
 ' THE ONE TRAP THIS DEMONSTRATES AVOIDING. PaintBorderRect goes through PaintRectFactory, which
 ' ALWAYS fills the rect with _backcolor before stroking it -- so reaching for it to draw the
 ' window outline or the footer divider floods everything underneath. That mistake has been made
-' three separate times in this family (CToggle, CComboBox, CNumericUpDown), every time by
+' three separate times in this family (PsToggle, PsComboBox, PsNumericUpDown), every time by
 ' copying a sibling's callback. PaintLine and PaintRoundOutline stroke without filling.
 '
-' The demo asserts it is not doing that, with CMessageBox_CountRenderedTones -- which is exactly
+' The demo asserts it is not doing that, with PsMessageBox_CountRenderedTones -- which is exactly
 ' the pattern a real host writing its own painter should copy.
 ' ========================================================================================
-private sub CMessageBox_DemoPaint( byval p as MBX_PAINTINFO ptr )
+private sub PsMessageBox_DemoPaint( byval p as MBX_PAINTINFO ptr )
     if p = 0 then exit sub
 
     ' A full-height accent stripe down the left edge instead of a caption band fill.
@@ -152,7 +152,7 @@ private sub CMessageBox_DemoPaint( byval p as MBX_PAINTINFO ptr )
         if p->isCloseHot then clrX = theme.ForeColorSelect
         p->b->SetFont( ghFont(SYMBOLFONT_10) )
         p->b->SetColors( clrX, theme.BackColor )
-        p->b->PaintText( wchr(CMESSAGEBOX_GLYPH_CLOSE), @rcX, DT_CENTER )
+        p->b->PaintText( wchr(PSMESSAGEBOX_GLYPH_CLOSE), @rcX, DT_CENTER )
     end if
 
     ' The icon and the message, with the SAME font and the SAME wrap flag the control measured
@@ -192,27 +192,27 @@ end sub
 ' box's loop has to end without ending the outer one, and the outer box's parent must stay
 ' disabled throughout. Returning FALSE lets the outer box carry on handling the click normally.
 ' ========================================================================================
-private function CMessageBox_DemoNestedMessage( byval m as MBX_MESSAGEINFO ptr ) as boolean
+private function PsMessageBox_DemoNestedMessage( byval m as MBX_MESSAGEINFO ptr ) as boolean
     if m = 0 then return false
     if m->uMsg <> WM_LBUTTONDOWN then return false
 
     ' Ignore clicks on the caption band -- those are the drag, and the close X lives there too.
     dim as RECT rcCap
-    CMessageBox_GetCaptionRect( m->hMsgBox, rcCap )
+    PsMessageBox_GetCaptionRect( m->hMsgBox, rcCap )
     dim as POINT pt
     pt.x = cast( short, loword(m->lParam) )
     pt.y = cast( short, hiword(m->lParam) )
     if PtInRect( @rcCap, pt ) then return false
 
-    dim as HWND hInner = CMessageBox_Create( m->hMsgBox )
+    dim as HWND hInner = PsMessageBox_Create( m->hMsgBox )
     ApplyDemoFonts( hInner )
-    CMessageBox_SetCaption( hInner, "Nested" )
-    CMessageBox_SetText( hInner, "This box was raised from inside the first box's own modal " & _
+    PsMessageBox_SetCaption( hInner, "Nested" )
+    PsMessageBox_SetText( hInner, "This box was raised from inside the first box's own modal " & _
                                  "loop. Dismissing it must return you to the first box, not " & _
                                  "to the main window." )
-    CMessageBox_SetIconKind( hInner, MBX_ICON_INFO )
-    CMessageBox_AddPreset( hInner, MBX_BTN_OK )
-    dim as long r = CMessageBox_DoModal( hInner )
+    PsMessageBox_SetIconKind( hInner, MBX_ICON_INFO )
+    PsMessageBox_AddPreset( hInner, MBX_BTN_OK )
+    dim as long r = PsMessageBox_DoModal( hInner )
 
     dim as string s = "  nested box returned " & str(r)
     print s
@@ -229,121 +229,121 @@ private sub RaiseBox( byval hwnd as HWND, byval idx as long )
     select case idx
 
     case DEMO_OK
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Information" )
-        CMessageBox_SetText( h, "The project was built successfully." )
-        CMessageBox_SetIconKind( h, MBX_ICON_INFO )
-        CMessageBox_AddPreset( h, MBX_BTN_OK )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetCaption( h, "Information" )
+        PsMessageBox_SetText( h, "The project was built successfully." )
+        PsMessageBox_SetIconKind( h, MBX_ICON_INFO )
+        PsMessageBox_AddPreset( h, MBX_BTN_OK )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_OKCANCEL
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Confirm" )
-        CMessageBox_SetText( h, "The selected files will be moved to the recycle bin." )
-        CMessageBox_SetIconKind( h, MBX_ICON_QUESTION )
-        CMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetCaption( h, "Confirm" )
+        PsMessageBox_SetText( h, "The selected files will be moved to the recycle bin." )
+        PsMessageBox_SetIconKind( h, MBX_ICON_QUESTION )
+        PsMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_YESNO
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Warning" )
-        CMessageBox_SetText( h, "Reload the file from disk and lose your edits?" )
-        CMessageBox_SetIconKind( h, MBX_ICON_WARNING )
-        CMessageBox_AddPreset( h, MBX_BTN_YESNO )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetCaption( h, "Warning" )
+        PsMessageBox_SetText( h, "Reload the file from disk and lose your edits?" )
+        PsMessageBox_SetIconKind( h, MBX_ICON_WARNING )
+        PsMessageBox_AddPreset( h, MBX_BTN_YESNO )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_YESNOCANCEL
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Warning" )
-        CMessageBox_SetText( h, "Three files have unsaved changes. Save them all before closing?" )
-        CMessageBox_SetIconKind( h, MBX_ICON_WARNING )
-        CMessageBox_AddPreset( h, MBX_BTN_YESNOCANCEL )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetCaption( h, "Warning" )
+        PsMessageBox_SetText( h, "Three files have unsaved changes. Save them all before closing?" )
+        PsMessageBox_SetIconKind( h, MBX_ICON_WARNING )
+        PsMessageBox_AddPreset( h, MBX_BTN_YESNOCANCEL )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_SAVE_LIGHT
         ' The reference screenshot, colour for colour.
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
         ApplyLightTheme( h )
-        CMessageBox_SetCaption( h, "Warning" )
-        CMessageBox_SetText( h, "This buffer contains unsaved edits. Do you want to save it?" )
-        CMessageBox_SetIconKind( h, MBX_ICON_WARNING )
-        CMessageBox_AddPreset( h, MBX_BTN_SAVE_DONTSAVE_CANCEL )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetCaption( h, "Warning" )
+        PsMessageBox_SetText( h, "This buffer contains unsaved edits. Do you want to save it?" )
+        PsMessageBox_SetIconKind( h, MBX_ICON_WARNING )
+        PsMessageBox_AddPreset( h, MBX_BTN_SAVE_DONTSAVE_CANCEL )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_ERROR_LONG
         ' The auto-height path: far more text than fits one line, so DT_CALCRECT decides how
         ' tall the box is. Note the box does NOT get wider than nMaxWidth for this.
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Build failed" )
-        CMessageBox_SetText( h, "The compiler reported 3 errors and 11 warnings while building " & _
+        PsMessageBox_SetCaption( h, "Build failed" )
+        PsMessageBox_SetText( h, "The compiler reported 3 errors and 11 warnings while building " & _
                                 "the active configuration. The first error was in " & _
                                 "modParser.inc at line 1284: 'Expected identifier, found " & _
                                 "HFONT'. Open the compiler log for the full output?" )
-        CMessageBox_SetIconKind( h, MBX_ICON_ERROR )
-        CMessageBox_AddButton( h, "Open Log", IDYES )
-        CMessageBox_AddButton( h, "Close", IDNO )
-        CMessageBox_SetDefaultButton( h, 0 )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetIconKind( h, MBX_ICON_ERROR )
+        PsMessageBox_AddButton( h, "Open Log", IDYES )
+        PsMessageBox_AddButton( h, "Close", IDNO )
+        PsMessageBox_SetDefaultButton( h, 0 )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_BARE
         ' No icon and no title. Both bands are still there -- the caption band is declared, not
         ' measured, so it does not collapse just because it has nothing in it.
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetText( h, "No icon, no title, one button." )
-        CMessageBox_AddPreset( h, MBX_BTN_OK )
-        CMessageBox_SetBeep( h, false )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetText( h, "No icon, no title, one button." )
+        PsMessageBox_AddPreset( h, MBX_BTN_OK )
+        PsMessageBox_SetBeep( h, false )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_FOCUSSPLIT
         ' Default and focus on DIFFERENT buttons: Delete carries the accent border and answers
         ' Enter, but Cancel is what has the focus ring when the box opens. SetFocusButton must
         ' be called AFTER SetDefaultButton or the default takes the focus with it.
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Delete" )
-        CMessageBox_SetText( h, "Permanently delete 42 items? Delete is the default button, " & _
+        PsMessageBox_SetCaption( h, "Delete" )
+        PsMessageBox_SetText( h, "Permanently delete 42 items? Delete is the default button, " & _
                                 "but Cancel has the focus." )
-        CMessageBox_SetIconKind( h, MBX_ICON_WARNING )
-        CMessageBox_AddButton( h, "Delete", IDYES )
-        CMessageBox_AddButton( h, "Cancel", IDCANCEL )
-        CMessageBox_SetDefaultButton( h, 0 )
-        CMessageBox_SetFocusButton( h, 1 )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetIconKind( h, MBX_ICON_WARNING )
+        PsMessageBox_AddButton( h, "Delete", IDYES )
+        PsMessageBox_AddButton( h, "Cancel", IDCANCEL )
+        PsMessageBox_SetDefaultButton( h, 0 )
+        PsMessageBox_SetFocusButton( h, 1 )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_CUSTOMPAINT
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Custom painter" )
-        CMessageBox_SetText( h, "The built-in painter has been replaced wholesale. The buttons " & _
+        PsMessageBox_SetCaption( h, "Custom painter" )
+        PsMessageBox_SetText( h, "The built-in painter has been replaced wholesale. The buttons " & _
                                 "still paint themselves -- they are real child windows." )
-        CMessageBox_SetIconKind( h, MBX_ICON_INFO )
-        CMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
-        CMessageBox_SetPaintCallback( h, @CMessageBox_DemoPaint )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetIconKind( h, MBX_ICON_INFO )
+        PsMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
+        PsMessageBox_SetPaintCallback( h, @PsMessageBox_DemoPaint )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_NESTED
-        dim as HWND h = CMessageBox_Create( hwnd )
+        dim as HWND h = PsMessageBox_Create( hwnd )
         ApplyDemoFonts( h )
-        CMessageBox_SetCaption( h, "Nesting" )
-        CMessageBox_SetText( h, "Click anywhere in this message area (not the caption) to " & _
+        PsMessageBox_SetCaption( h, "Nesting" )
+        PsMessageBox_SetText( h, "Click anywhere in this message area (not the caption) to " & _
                                 "raise a second modal box on top of this one." )
-        CMessageBox_SetIconKind( h, MBX_ICON_QUESTION )
-        CMessageBox_AddPreset( h, MBX_BTN_OK )
-        CMessageBox_SetMessageCallback( h, @CMessageBox_DemoNestedMessage )
-        r = CMessageBox_DoModal( h )
+        PsMessageBox_SetIconKind( h, MBX_ICON_QUESTION )
+        PsMessageBox_AddPreset( h, MBX_BTN_OK )
+        PsMessageBox_SetMessageCallback( h, @PsMessageBox_DemoNestedMessage )
+        r = PsMessageBox_DoModal( h )
 
     case DEMO_ONELINER
         ' The convenience wrapper. It sets NO fonts, so the icon comes out as a missing-glyph
         ' box -- deliberately shown rather than papered over, because that is exactly what a
         ' host gets if it reaches for the one-liner and expects icons.
-        r = CMessageBox_Show( hwnd, "Raised with the one-line CMessageBox_Show wrapper. " & _
+        r = PsMessageBox_Show( hwnd, "Raised with the one-line PsMessageBox_Show wrapper. " & _
                                     "It sets no fonts, so the icon is a missing glyph.", _
                                     "One-liner", MBX_ICON_INFO, MBX_BTN_OKCANCEL )
     end select
@@ -365,7 +365,7 @@ end sub
 ' Probe the HOST's OWN paint callback, offscreen, at startup.
 '
 ' THIS IS THE PATTERN A REAL HOST SHOULD COPY. The control's self-test can only ever measure the
-' BUILT-IN painter -- it knows nothing about CMessageBox_DemoPaint -- and a host callback is
+' BUILT-IN painter -- it knows nothing about PsMessageBox_DemoPaint -- and a host callback is
 ' exactly where the PaintBorderRect flood has shipped from three times in this family.
 '
 ' The thresholds are calibrated to THIS callback, not copied from the control's. The demo
@@ -373,22 +373,22 @@ end sub
 ' its healthy numbers are its own; they were measured, and a flood reads 1-2.
 ' ========================================================================================
 private sub frmMain_ProbeCustomPainter( byval hwnd as HWND )
-    if environ("CMESSAGEBOX_SELFTEST") <> "1" then exit sub
+    if environ("PSMESSAGEBOX_SELFTEST") <> "1" then exit sub
 
-    dim as HWND h = CMessageBox_Create( hwnd )
+    dim as HWND h = PsMessageBox_Create( hwnd )
     if h = 0 then exit sub
     ApplyDemoFonts( h )
-    CMessageBox_SetCaption( h, "Custom painter" )
-    CMessageBox_SetText( h, "The built-in painter has been replaced wholesale. The buttons " & _
+    PsMessageBox_SetCaption( h, "Custom painter" )
+    PsMessageBox_SetText( h, "The built-in painter has been replaced wholesale. The buttons " & _
                             "still paint themselves -- they are real child windows." )
-    CMessageBox_SetIconKind( h, MBX_ICON_INFO )
-    CMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
-    CMessageBox_SetPaintCallback( h, @CMessageBox_DemoPaint )
-    CMessageBox_LayoutForTest( h )
+    PsMessageBox_SetIconKind( h, MBX_ICON_INFO )
+    PsMessageBox_AddPreset( h, MBX_BTN_OKCANCEL )
+    PsMessageBox_SetPaintCallback( h, @PsMessageBox_DemoPaint )
+    PsMessageBox_LayoutForTest( h )
 
-    dim as long tCap  = CMessageBox_CountRenderedTones( h, MBX_PART_CAPTION )
-    dim as long tBody = CMessageBox_CountRenderedTones( h, MBX_PART_BODY )
-    dim as long tFoot = CMessageBox_CountRenderedTones( h, MBX_PART_FOOTER )
+    dim as long tCap  = PsMessageBox_CountRenderedTones( h, MBX_PART_CAPTION )
+    dim as long tBody = PsMessageBox_CountRenderedTones( h, MBX_PART_BODY )
+    dim as long tFoot = PsMessageBox_CountRenderedTones( h, MBX_PART_FOOTER )
 
     dim as string sHost = "PASS  "
     if (tCap < 10) orelse (tBody < 10) orelse (tFoot < 3) then sHost = "FAIL  "
@@ -404,7 +404,7 @@ end sub
 ' Process WM_PAINT message for window/dialog: frmMain
 ' ========================================================================================
 function frmMain_OnPaint( byval hwnd as HWND ) as LRESULT
-    dim as CBufferPaint b
+    dim as PsBufferPaint b
 
     b.BeginDoubleBuffer(hwnd)
     b.SetBackColor( theme.BackColor )
@@ -462,7 +462,7 @@ sub frmMain_PositionButtons( byval hwnd as HWND )
 
         dim as RECT rcRow = RowRect( hwnd, i )
         dim as long iw, ih
-        CButton_GetIdealSize( ghRaise(i), iw, ih )
+        PsButton_GetIdealSize( ghRaise(i), iw, ih )
         if (iw <= 0) orelse (ih <= 0) then continue for
 
         dim as long x = rcRow.right - margin - iw
@@ -583,15 +583,15 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
     gRows(DEMO_CUSTOMPAINT).wszNote   = "built-in painter replaced wholesale; buttons still paint themselves"
     gRows(DEMO_NESTED).wszLabel       = "Nested modal boxes"
     gRows(DEMO_NESTED).wszNote        = "click the message area to raise a second loop on top"
-    gRows(DEMO_ONELINER).wszLabel     = "CMessageBox_Show one-liner"
+    gRows(DEMO_ONELINER).wszLabel     = "PsMessageBox_Show one-liner"
     gRows(DEMO_ONELINER).wszNote      = "sets no fonts, so the icon is honestly a missing glyph"
 
     for i as long = 0 to DEMO_ROW_COUNT - 1
-        ghRaise(i) = CButton_Create( HWND_FRMMAIN, IDC_FRMMAIN_BTN_FIRST + i )
-        CButton_SetFont( ghRaise(i), ghFont(GUIFONT_10) )
-        CButton_SetGlyphFont( ghRaise(i), ghFont(SYMBOLFONT_10) )
-        CButton_SetText( ghRaise(i), "Show" )
-        CButton_SetClickCallback( ghRaise(i), @frmMain_OnRaiseClicked )
+        ghRaise(i) = PsButton_Create( HWND_FRMMAIN, IDC_FRMMAIN_BTN_FIRST + i )
+        PsButton_SetFont( ghRaise(i), ghFont(GUIFONT_10) )
+        PsButton_SetGlyphFont( ghRaise(i), ghFont(SYMBOLFONT_10) )
+        PsButton_SetText( ghRaise(i), "Show" )
+        PsButton_SetClickCallback( ghRaise(i), @frmMain_OnRaiseClicked )
     next
 
     frmMain_PositionButtons( HWND_FRMMAIN )
@@ -599,8 +599,8 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
         ShowWindow( ghRaise(i), SW_SHOW )
     next
 
-    ' Self-gated on CMESSAGEBOX_SELFTEST=1. Runs before the loop and never goes modal.
-    CMessageBox_RunSelfTest( HWND_FRMMAIN )
+    ' Self-gated on PSMESSAGEBOX_SELFTEST=1. Runs before the loop and never goes modal.
+    PsMessageBox_RunSelfTest( HWND_FRMMAIN )
     frmMain_ProbeCustomPainter( HWND_FRMMAIN )
 
     UpdateWindow( pWindow->hWindow )
@@ -618,8 +618,8 @@ function frmMain_Show( byval hWndParent as HWND ) as LRESULT
 
     ' Message loop
     '
-    ' THERE IS NO CMessageBox_FilterMessage. The box runs its OWN nested pump inside DoModal and
-    ' calls IsDialogMessage itself, so unlike CComboBox / CNumericUpDown / CTextBox this control
+    ' THERE IS NO PsMessageBox_FilterMessage. The box runs its OWN nested pump inside DoModal and
+    ' calls IsDialogMessage itself, so unlike PsComboBox / PsNumericUpDown / PsTextBox this control
     ' adds NO pump obligation. The IsDialogMessage below is for the demo's own buttons.
     do while GetMessage(@uMsg, null, 0, 0)
         if uMsg.message = WM_QUIT then exit do
