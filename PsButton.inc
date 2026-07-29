@@ -1129,14 +1129,17 @@ sub PsButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
     pBtn->wszTooltip = Text
 end sub
 
+' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
+' to a PsTooltip window is silently ignored.
 function PsButton_GetTooltipHandle( byval hButton as HWND ) as HWND
     dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
     return PsTipHost_SysHandle( @pBtn->tip )
 end function
 
-' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
-' to a PsTooltip window is silently ignored.
+' The PsTooltip window, and 0 while on the system backend. This is the door to PsTooltip's
+' own SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph, none of which is mirrored
+' on this control.
 function PsButton_GetPsTooltipHandle( byval hButton as HWND ) as HWND
     dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
