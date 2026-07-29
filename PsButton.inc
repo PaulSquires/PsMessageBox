@@ -3,6 +3,8 @@
 ''
 
 #include once "PsButton.bi"
+' The tooltip backend switch, pulled in here so a host needs no extra include line.
+#include once "PsTipHost.inc"
 
 
 ' Forward declaration: the content setters re-apply auto-size, and they are defined well above
@@ -618,7 +620,7 @@ function PsButton_WndProc( _
         ' Delete the stored button data pointer. The two fonts are the host's and are left
         ' alone; the tooltip window is ours and goes with us.
         if pBtn then
-            if IsWindow(pBtn->hToolTip) then DestroyWindow(pBtn->hToolTip)
+            PsTipHost_Destroy( @pBtn->tip )
             delete(pBtn)
         end if
 
@@ -636,32 +638,17 @@ end function
 
 
 ' ========================================================================================
-' Create a tooltip that pulls its text on demand (LPSTR_TEXTCALLBACK) for the whole control.
-' TTN_GETDISPINFOW therefore goes to TOOLINFO.hwnd, which is the control itself (NOT the parent
-' form), and PsButton_WndProc answers it.
+' Supply the tooltip text to the PsTooltip backend.
+'
+' This thunk is why PsTipHost never learns the text policy: PsButton_ResolveTooltipText
+' stays the ONE place that decides what a tip says, and the system backend reaches the
+' same function by the other road (comctl32 asking through TTN_GETDISPINFOW), which is
+' why that arm stays in the WndProc.
 ' ========================================================================================
-private function PsButton_AddTooltip( byval hCtrl as HWND ) as HWND
-    if IsWindow(hCtrl) = 0 then return 0
-    dim as HWND hTooltip = CreateWindowExW( 0, "tooltips_class32", "", _
-                                            WS_POPUP or TTS_ALWAYSTIP, _
-                                            0, 0, 0, 0, NULL, NULL, NULL, NULL )
-    if hTooltip = 0 then return 0
-    SetWindowPos( hTooltip, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE or SWP_NOACTIVATE )
-
-    dim tti as TOOLINFOW
-    ' cbSize must match the running comctl32 version (see AfxNova AfxAddTooltip).
-    #ifdef __FB_64BIT__
-        if AfxComCtlVersion < 600 then tti.cbSize = 64 else tti.cbSize = 72
-    #else
-        if AfxComCtlVersion < 600 then tti.cbSize = 44 else tti.cbSize = 48
-    #endif
-    tti.uFlags   = TTF_IDISHWND or TTF_SUBCLASS
-    tti.hwnd     = hCtrl
-    tti.uId      = cast(UINT_PTR, hCtrl)
-    tti.hinst    = GetModuleHandleW(NULL)
-    tti.lpszText = LPSTR_TEXTCALLBACK
-    SendMessageW( hTooltip, TTM_ADDTOOLW, 0, cast(LPARAM, @tti) )
-    return hTooltip
+private function PsButton_TipTextCallback( byval hTooltip as HWND, byval hAttached as HWND, _
+                                        byval idx as long ) as DWSTRING
+    dim as DWSTRING wszOut = PsButton_ResolveTooltipText( GetButtonPointer(hAttached) )
+    return wszOut
 end function
 
 
@@ -717,12 +704,15 @@ function PsButton_Create( byval hWndParent as HWND, byval CtrlID as long ) as HW
     pBtn->nCurvature  = pWindow->ScaleY( PSBUTTON_DEFAULT_CURVATURE )
     pBtn->nFocusGap   = pWindow->ScaleY( PSBUTTON_DEFAULT_FOCUSGAP )
 
-    pBtn->hToolTip = PsButton_AddTooltip( hCtrl )
 
     SetWindowLongPtr( hCtrl, GWLP_ID, CtrlID )
 
     ' Store the new pointer into the user data area of the control window
     pWindow->UserData(0) = cast(LONG_PTR, pBtn)
+
+    ' AFTER UserData, not before: PsButton_TipTextCallback resolves the control through
+    ' GetButtonPointer(hAttached), which reads exactly that slot.
+    PsTipHost_Ensure( @pBtn->tip, hCtrl, @PsButton_TipTextCallback )
 
     function = hCtrl
 
@@ -1139,19 +1129,55 @@ sub PsButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
     pBtn->wszTooltip = Text
 end sub
 
+' The comctl32 handle, and 0 while on PsTooltip -- the honest answer, since a TTM_* sent
+' to a PsTooltip window is silently ignored.
 function PsButton_GetTooltipHandle( byval hButton as HWND ) as HWND
     dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then return 0
-    return pBtn->hToolTip
+    return PsTipHost_SysHandle( @pBtn->tip )
 end function
 
+' The PsTooltip window, and 0 while on the system backend. This is the door to PsTooltip's
+' own SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph, none of which is mirrored
+' on this control.
+function PsButton_GetPsTooltipHandle( byval hButton as HWND ) as HWND
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
+    if pBtn = 0 then return 0
+    return PsTipHost_PsHandle( @pBtn->tip )
+end function
+
+function PsButton_SetTooltipMode( byval hButton as HWND, byval nMode as long ) as boolean
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
+    if pBtn = 0 then return false
+    return PsTipHost_SetMode( @pBtn->tip, nMode )
+end function
+
+function PsButton_GetTooltipMode( byval hButton as HWND ) as long
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
+    if pBtn = 0 then return PSTIP_MODE_SYSTEM
+    return PsTipHost_GetMode( @pBtn->tip )
+end function
+
+' The three delays go through PsTipHost, which STORES them as well as pushing them, so a
+' hover time set before a mode switch is still in force after it. Pushing straight at the
+' live tooltip loses it at the switch -- and the tip still appears, just on a different
+' beat, with nothing reporting the change.
 sub PsButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
     dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
     if pBtn = 0 then exit sub
-    pBtn->HoverTime = milliseconds
-    if pBtn->hToolTip then
-        SendMessageW( pBtn->hToolTip, TTM_SETDELAYTIME, TTDT_INITIAL, cast(LPARAM, milliseconds) )
-    end if
+    PsTipHost_SetDelay( @pBtn->tip, TTDT_INITIAL, milliseconds )
+end sub
+
+sub PsButton_SetAutoPopTime( byval hButton as HWND, byval milliseconds as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
+    if pBtn = 0 then exit sub
+    PsTipHost_SetDelay( @pBtn->tip, TTDT_AUTOPOP, milliseconds )
+end sub
+
+sub PsButton_SetReshowTime( byval hButton as HWND, byval milliseconds as long )
+    dim as PSBUTTON ptr pBtn = GetButtonPointer(hButton)
+    if pBtn = 0 then exit sub
+    PsTipHost_SetDelay( @pBtn->tip, TTDT_RESHOW, milliseconds )
 end sub
 
 

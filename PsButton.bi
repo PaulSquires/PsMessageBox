@@ -8,6 +8,9 @@
 ' AfxNova, and every host in this family says "using AfxNova" -- so ANY identifier named "ok"
 ' becomes a duplicate definition. The family convention is bOK.
 #include once "PsBufferPaint.bi"
+' The tooltip backend switch. The control ships on the SYSTEM (comctl32) backend exactly
+' as it always has; a host opts an instance into PsTooltip with PsButton_SetTooltipMode.
+#include once "PsTipHost.bi"
 
 ' Polling timer that guarantees hot-tracking is cleared when the mouse leaves the control.
 ' WM_MOUSELEAVE (TME_LEAVE) is not reliably delivered on fast exits, so a periodic cursor
@@ -223,7 +226,10 @@ type BTN_ClickCallbackSub as sub( byval hButton as HWND, byval id as long )
 
 type PSBUTTON
     hWin            as HWND
-    hToolTip        as HWND
+    ' The tooltip, whichever backend it is on. Replaces the old hToolTip + HoverTime
+    ' pair; PsButton_GetTooltipHandle still answers the comctl32 handle, and 0 while
+    ' this instance is on PsTooltip.
+    tip       as PSTIPHOST
     ' Instance-lifetime buffer that TTN_GETDISPINFOW's lpszText is pointed at. It must NOT be
     ' the same field as wszTooltip below: that one is the host's authored text, and overwriting
     ' it with a callback's answer would silently promote a transient string into stored state.
@@ -231,7 +237,6 @@ type PSBUTTON
     idc_Button      as long = 0
     id              as long = 0        ' host command id, reported by ClickCallback
     itemData        as integer = 0     ' free-form host payload
-    HoverTime       as long = 250
     ' --- Content ---
     wszText         as DWSTRING        ' the caption. "" = no caption (and no icon gap spent)
     wszGlyphLeft    as DWSTRING        ' Segoe Fluent Icons codepoint(s), or ""
@@ -782,6 +787,16 @@ declare function PsButton_GetTooltipText( byval hButton as HWND ) as DWSTRING
 declare sub      PsButton_SetTooltipText( byval hButton as HWND, byval Text as DWSTRING )
 declare function PsButton_GetTooltipHandle( byval hButton as HWND ) as HWND
 declare sub      PsButton_SetHoverTime( byval hButton as HWND, byval milliseconds as long )
+declare function PsButton_SetTooltipMode( byval hButton as HWND, byval nMode as long ) as boolean
+declare function PsButton_GetTooltipMode( byval hButton as HWND ) as long
+' The PsTooltip window, or 0 on the system backend. The door to PsTooltip's own
+' SetColors/SetFonts/SetStyle/SetMaxWidth/SetTitle/SetGlyph -- deliberately not mirrored
+' here, since thirteen controls x twenty setters is 260 wrappers to keep in step.
+declare function PsButton_GetPsTooltipHandle( byval hButton as HWND ) as HWND
+' Honoured by BOTH backends. A delay never set keeps the backend's own derivation from
+' the system double-click time.
+declare sub      PsButton_SetAutoPopTime( byval hButton as HWND, byval milliseconds as long )
+declare sub      PsButton_SetReshowTime( byval hButton as HWND, byval milliseconds as long )
 
 ' ----------------------------------------------------------------------------------------
 ' Callbacks.  See the type declarations above for each signature and contract.

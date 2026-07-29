@@ -36,8 +36,14 @@ An actual modal box, raised from the demo and captured while its nested message 
 | `PsMessageBox.inc` | Implementation |
 | `PsButton.bi` | The footer buttons are PsButtons |
 | `PsButton.inc` | Its implementation |
+| `PsTipHost.bi` / `.inc` | The buttons' tooltip backend — pulled in by `PsButton.bi` / `PsButton.inc` |
+| `PsTooltip.bi` / `.inc` | Pulled in by `PsTipHost` |
 | `PsBufferPaint.bi` | The flicker-free drawing surface the control paints through |
 | `PsBufferPaint.inc` | Its implementation |
+
+The last four are transitive: the box itself has no tooltips, but `PsButton` does, and its header
+chain names those files. They must be present in the build even though nothing in the
+`PsMessageBox_*` surface refers to them.
 
 **Use the `PsBufferPaint` copy shipped in this repo.** The box draws its wrapped message with
 `PsBufferPaint.PaintTextEx`. `PaintText` forces `DT_VCENTER or DT_SINGLELINE`, which cannot coexist
@@ -524,7 +530,7 @@ All four handles are borrowed. Keep them alive and destroy them yourself.
 | `PsMessageBox_SetButtonColors( hMsgBox, pColors as PSBUTTON_COLORS ptr )` | Pushes a `PSBUTTON_COLORS` set into every button that exists **now** and stores it for every button added **later**, so the order of this call and `AddButton` does not matter. Without it, a re-coloured box keeps the buttons' own defaults. |
 | `PsMessageBox_ResolveGlyph( nKind ) as DWSTRING` | The glyph an `MBX_ICON_*` kind draws — a one-character string holding the matching `PSMESSAGEBOX_GLYPH_*` codepoint, or `""` for `MBX_ICON_NONE` or any value outside the five constants. A **pure function**: it takes no box handle and touches no global, so you can call it for any kind at any time. Note it does **not** fold in a `PsMessageBox_SetGlyph` override — it answers exactly one question, "what does this kind map to". |
 | `PsMessageBox_ResolveIconColor( nKind, pColors as MBX_COLORS ptr ) as COLORREF` | The colour that kind draws in, read out of the `MBX_COLORS` you hand it: `IconColorInfo`, `IconColorWarning`, `IconColorError` or `IconColorQuestion`. Also pure. `MBX_ICON_NONE` and out-of-range values answer `pColors->ForeColor` — the body's own foreground, so that a careless painter cannot draw with a sentinel. Returns 0 if `pColors` is null. Like the above, it ignores a `PsMessageBox_SetIconColor` override. |
-| `PsMessageBox_CountRenderedTones( hMsgBox, nPart ) as long` | Renders the box offscreen with its **current** painter and returns how many distinct colours land inside one `MBX_PART_*` rect, capped at 64. A diagnostic for hosts that install a paint callback — see *Callbacks*. Returns 0 if the box has no client area yet, so size the window first (`SetWindowPos` to `PsMessageBox_GetIdealSize`). |
+| `PsMessageBox_CountRenderedTones( hMsgBox, nPart ) as long` | Renders the box offscreen with its **current** painter and returns how many distinct colours land inside one `MBX_PART_*` rect, capped at 64. A diagnostic for hosts that install a paint callback — see *Callbacks*. Returns 0 if the box has no client area yet, so size the window first — `PsMessageBox_LayoutForTest` does exactly that without showing the box. |
 
 The two resolvers are there for a host writing its own paint callback that wants to draw an icon
 of its own while still matching the kind, or that wants to know a kind's glyph and colour without
@@ -549,6 +555,22 @@ PsMessageBox_SetColors( hBox, @clrs )
 | `PsMessageBox_SetMessageCallback( hMsgBox, userfunc )` | Installs an observer for the box's own messages. |
 
 Both are optional and independent.
+
+### Test seam
+
+| Function | Description |
+|---|---|
+| `PsMessageBox_LayoutForTest( hMsgBox )` | Forces a full measuring pass and resizes the window to `PsMessageBox_GetIdealSize`, **without showing it and without entering the modal loop**. The window stays hidden and never takes activation (`SWP_NOACTIVATE`, no `SW_SHOW`), so it is safe to call from inside a host that is running. |
+
+This is the only way to get at the box's geometry without `PsMessageBox_DoModal`, and `DoModal`
+blocks — so a host that wants to assert its own layout, or to run
+`PsMessageBox_CountRenderedTones` against its paint callback, would otherwise have to enter the
+modal loop and never return. Every rect the box owns depends on the client area, and the client
+area is only established when the window is sized; this sizes it and stops there.
+
+Call it after the box is fully configured (content, fonts, buttons), and before any rect query or
+the tone probe. Then destroy the box yourself with `DestroyWindow` — a box laid out this way was
+never shown and never went through `DoModal`, so nothing has destroyed it for you.
 
 ---
 
